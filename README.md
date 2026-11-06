@@ -1,6 +1,6 @@
 # Currency Converter
 
-A currency converter for your phone, with a dark, minimal mech-HUD look. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
+A currency converter for your phone, with a minimal mech-HUD look in dark or light (or matching your phone's setting: Settings → Appearance). Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
 
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
@@ -69,7 +69,7 @@ Project layout:
 
 | Path | What it does |
 | --- | --- |
-| `index.html`, `css/styles.css` | Page structure and the HUD theme |
+| `index.html`, `css/styles.css` | Page structure and the HUD theme (dark and light colour sets; the camera view always stays dark) |
 | `js/app.js` | Screens, settings and user interaction |
 | `js/camera.js` | The in-app live camera (start/stop, flashlight, grabbing frames) |
 | `js/scan.js` | Photo pipeline: prices, language identification, re-reading in the right script |

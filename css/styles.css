@@ -12,7 +12,11 @@
   font-display: swap;
 }
 
-:root {
+/* Dark is the default. The camera view and the scanning overlay sit on top of a photo or video,
+   so they always use the dark colours. */
+:root,
+.camera,
+.scan-progress {
   color-scheme: dark;
   --bg: #040605;
   --panel: #08100b;
@@ -29,10 +33,86 @@
   --text-faint: #4a6353;
   --warn: #ffb02e;
   --danger: #ff5a47;
+  --grid-line: rgba(125, 255, 114, 0.028);
+  --scanline: rgba(0, 0, 0, 0.16);
+  --topbar-fade: rgba(4, 6, 5, 0.85);
+  --statusbar: var(--bg);
+  --secondary-fill: #07130a;
+  --menu-open-fill: #0b1d0f;
+  --tag-bg: rgba(2, 9, 3, 0.9);
+  --tag-text: #e8ffe9;
+  --tag-shadow: rgba(0, 0, 0, 0.6);
+  --tabbar-bg: rgba(3, 6, 4, 0.96);
+  --scrim: rgba(0, 0, 0, 0.7);
+  --toast-bg: rgba(2, 8, 3, 0.96);
   --font-mono: "Share Tech Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --font-head: "Chakra Petch", "Share Tech Mono", ui-sans-serif, system-ui, sans-serif;
   --tabbar-h: 62px;
   --cut: 14px;
+}
+
+/* Light: chosen in Settings, or following the phone when set to System. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #e9eee8;
+  --panel: #f8faf7;
+  --panel-2: #eef3ed;
+  --line: #cfdad1;
+  --line-strong: #9fb6a5;
+  --accent: #12802a;
+  --accent-dim: #5a9e66;
+  --accent-soft: rgba(18, 128, 42, 0.08);
+  --glow: rgba(18, 128, 42, 0.18);
+  --on-accent: #ffffff;
+  --text: #142018;
+  --text-dim: #4b6052;
+  --text-faint: #6f8475;
+  --warn: #a86400;
+  --danger: #c4311e;
+  --grid-line: rgba(18, 128, 42, 0.06);
+  --scanline: rgba(0, 0, 0, 0.03);
+  --topbar-fade: rgba(233, 238, 232, 0.85);
+  --statusbar: #040605; /* iPhone home-screen apps draw white status text, so keep a dark strip behind it */
+  --secondary-fill: #f4f8f3;
+  --menu-open-fill: #e2efe4;
+  --tag-bg: #ffffff;
+  --tag-text: #102016;
+  --tag-shadow: rgba(0, 0, 0, 0.25);
+  --tabbar-bg: rgba(248, 250, 247, 0.96);
+  --scrim: rgba(12, 24, 15, 0.45);
+  --toast-bg: rgba(255, 255, 255, 0.98);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #e9eee8;
+    --panel: #f8faf7;
+    --panel-2: #eef3ed;
+    --line: #cfdad1;
+    --line-strong: #9fb6a5;
+    --accent: #12802a;
+    --accent-dim: #5a9e66;
+    --accent-soft: rgba(18, 128, 42, 0.08);
+    --glow: rgba(18, 128, 42, 0.18);
+    --on-accent: #ffffff;
+    --text: #142018;
+    --text-dim: #4b6052;
+    --text-faint: #6f8475;
+    --warn: #a86400;
+    --danger: #c4311e;
+    --grid-line: rgba(18, 128, 42, 0.06);
+    --scanline: rgba(0, 0, 0, 0.03);
+    --topbar-fade: rgba(233, 238, 232, 0.85);
+    --statusbar: #040605; /* iPhone home-screen apps draw white status text, so keep a dark strip behind it */
+    --secondary-fill: #f4f8f3;
+    --menu-open-fill: #e2efe4;
+    --tag-bg: #ffffff;
+    --tag-text: #102016;
+    --tag-shadow: rgba(0, 0, 0, 0.25);
+    --tabbar-bg: rgba(248, 250, 247, 0.96);
+    --scrim: rgba(12, 24, 15, 0.45);
+    --toast-bg: rgba(255, 255, 255, 0.98);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -42,8 +122,8 @@ body {
   margin: 0;
   background-color: var(--bg);
   background-image:
-    linear-gradient(rgba(125, 255, 114, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(125, 255, 114, 0.028) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 32px 32px;
   color: var(--text);
   font-family: var(--font-mono);
@@ -61,7 +141,7 @@ body::after {
   inset: 0;
   z-index: 100;
   pointer-events: none;
-  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.16) 2px 3px);
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scanline) 2px 3px);
 }
 
 button, input, select { font: inherit; color: inherit; }
@@ -92,7 +172,12 @@ strong { color: var(--accent); font-weight: 400; }
   justify-content: space-between;
   gap: 12px;
   padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
-  background: linear-gradient(var(--bg) 70%, rgba(4, 6, 5, 0.85));
+  background: linear-gradient(
+    var(--statusbar) env(safe-area-inset-top, 0px),
+    var(--bg) env(safe-area-inset-top, 0px),
+    var(--bg) 70%,
+    var(--topbar-fade)
+  );
   border-bottom: 1px solid var(--line);
 }
 .topbar::after {
@@ -247,7 +332,7 @@ main { padding: 16px 16px 0; }
   position: absolute;
   inset: 1px;
   z-index: -1;
-  background: #07130a;
+  background: var(--secondary-fill);
   clip-path: polygon(calc(var(--c) - 0.6px) 0, 100% 0, 100% calc(100% - var(--c) + 0.6px), calc(100% - var(--c) + 0.6px) 100%, 0 100%, 0 calc(var(--c) - 0.6px));
 }
 .btn-ghost { background: transparent; color: var(--text-dim); clip-path: none; }
@@ -417,7 +502,7 @@ main { padding: 16px 16px 0; }
 .menu-btn .count { min-width: 20px; padding: 0 5px; background: var(--accent-soft); font-family: var(--font-mono); letter-spacing: 0; color: var(--accent); }
 .menu-btn .menu-chevron { width: 14px; height: 14px; color: var(--text-dim); transition: transform 0.15s ease; }
 .menu-btn[aria-expanded="true"] { background: var(--accent); }
-.menu-btn[aria-expanded="true"]::before { background: #0b1d0f; }
+.menu-btn[aria-expanded="true"]::before { background: var(--menu-open-fill); }
 .menu-btn[aria-expanded="true"] .menu-chevron { transform: rotate(180deg); }
 
 /* The "sandwich": extra currencies tucked between the two amounts */
@@ -572,6 +657,8 @@ main { padding: 16px 16px 0; }
   text-transform: uppercase;
 }
 .segmented button:first-child { border-left: 0; }
+.segmented.full { display: flex; width: 100%; }
+.segmented.full button { flex: 1; min-height: 40px; }
 .segmented button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 
 .photo-wrap {
@@ -623,14 +710,14 @@ main { padding: 16px 16px 0; }
   transform: translate(-50%, -50%);
   padding: 0.08em 0.35em;
   border: 1px solid var(--accent);
-  background: rgba(2, 9, 3, 0.9);
+  background: var(--tag-bg);
   color: var(--accent);
   font-family: var(--font-mono);
   font-size: clamp(12px, calc(var(--h) * var(--scale) * 0.75px), 30px);
   line-height: 1.1;
   white-space: nowrap;
   text-shadow: 0 0 8px var(--glow);
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 10px var(--tag-shadow);
 }
 .price-tag.low { border-color: var(--warn); color: var(--warn); text-shadow: none; }
 .price-tag::after { content: ""; position: absolute; inset: -8px; } /* bigger tap target */
@@ -643,8 +730,8 @@ main { padding: 16px 16px 0; }
   overflow: hidden;
   padding: 0 0.3em;
   border-left: 2px solid var(--accent);
-  background: rgba(2, 9, 3, 0.9);
-  color: #e8ffe9;
+  background: var(--tag-bg);
+  color: var(--tag-text);
   font-family: var(--font-mono);
   font-size: clamp(8px, calc(var(--fs) * var(--scale) * 1px), 34px);
   line-height: 1.05;
@@ -789,7 +876,7 @@ main { padding: 16px 16px 0; }
   display: flex;
   justify-content: center;
   padding: 6px max(12px, env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom));
-  background: rgba(3, 6, 4, 0.96);
+  background: var(--tabbar-bg);
   border-top: 1px solid var(--line-strong);
 }
 .tabbar button {
@@ -832,7 +919,7 @@ main { padding: 16px 16px 0; }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
   animation: fade 0.15s ease;
 }
 
@@ -1047,7 +1134,7 @@ main { padding: 16px 16px 0; }
   max-width: calc(100% - 32px);
   padding: 10px 14px;
   border: 1px solid var(--accent-dim);
-  background: rgba(2, 8, 3, 0.96);
+  background: var(--toast-bg);
   color: var(--accent);
   font-size: 13px;
   letter-spacing: 0.04em;

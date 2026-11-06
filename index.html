@@ -5,8 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Currency Converter</title>
   <meta name="description" content="Convert and translate prices. Type them in or snap a photo of a price tag or menu.">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#050806">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#040605">
+  <script>
+    // Apply a chosen light/dark theme before the page draws, so it doesn't flash.
+    try {
+      var theme = (JSON.parse(localStorage.getItem('cc.settings')) || {}).theme;
+      if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    } catch (e) {}
+  </script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Converter">
@@ -170,7 +177,7 @@
           </div>
 
           <div class="scan-toolbar">
-            <div class="segmented" role="group" aria-label="Photo labels">
+            <div class="segmented" id="scan-modes" role="group" aria-label="Photo labels">
               <button type="button" data-mode="converted" aria-pressed="true">Prices</button>
               <button type="button" data-mode="text" aria-pressed="false" hidden>Text</button>
               <button type="button" data-mode="original" aria-pressed="false">Raw</button>
@@ -207,6 +214,15 @@
 
       <!-- Settings -->
       <section class="view" data-view="settings" hidden>
+        <div class="panel">
+          <div class="panel-head"><span>Appearance</span></div>
+          <div class="segmented full" id="theme-options" role="group" aria-label="Theme">
+            <button type="button" data-theme-option="system" aria-pressed="false">System</button>
+            <button type="button" data-theme-option="light" aria-pressed="false">Light</button>
+            <button type="button" data-theme-option="dark" aria-pressed="false">Dark</button>
+          </div>
+        </div>
+
         <div class="panel list">
           <div class="panel-head"><span>Currency</span></div>
           <button type="button" class="list-row" data-pick="home">

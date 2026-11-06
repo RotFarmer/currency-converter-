@@ -21,7 +21,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v9'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v10'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -49,6 +49,7 @@ const settings = {
   homeChosen: false, // the user picked their home currency themselves
   autoSource: true, // keep "prices in" set to the currency where the phone is
   sourceRegion: null, // country detected for "prices in"
+  theme: 'system', // "system" follows the phone; or "light" / "dark"
   ...load('settings', {}),
 };
 settings.home ||= guessHomeCurrency();
@@ -72,6 +73,31 @@ function setCurrency(role, code) {
   renderAll();
   if (firstHome) detectSource({ askPermission: true });
 }
+
+/* ---------- Theme ---------- */
+
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+
+function applyTheme() {
+  const { theme } = settings;
+  if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+  else delete document.documentElement.dataset.theme;
+  const dark = theme === 'dark' || (theme !== 'light' && darkQuery.matches);
+  // Colours the phone's status bar / browser bar to match.
+  $('meta[name="theme-color"]').setAttribute('content', dark ? '#040605' : '#e9eee8');
+  for (const button of $$('[data-theme-option]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.themeOption === (theme || 'system')));
+  }
+}
+
+darkQuery.addEventListener('change', applyTheme);
+$('#theme-options').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-theme-option]');
+  if (!button) return;
+  settings.theme = button.dataset.themeOption;
+  saveSettings();
+  applyTheme();
+});
 
 /* ---------- Home currency and location ---------- */
 
@@ -1072,7 +1098,7 @@ for (const input of $$('[data-photo-input]')) {
   });
 }
 
-$('.segmented').addEventListener('click', (event) => {
+$('#scan-modes').addEventListener('click', (event) => {
   const button = event.target.closest('[data-mode]');
   if (!button) return;
   scan.mode = button.dataset.mode;
@@ -1527,6 +1553,7 @@ window.addEventListener('online', () => {
 /* ---------- Start ---------- */
 
 saveSettings();
+applyTheme();
 renderAll();
 if (ratesAreStale()) updateRates();
 
