@@ -41,9 +41,7 @@ public class ReferenceWidget extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.widget_root, Widgets.openApp(context));
         views.setOnClickPendingIntent(R.id.updated, Widgets.refresh(context));
         views.setTextViewText(R.id.updated, Widgets.text(data, Widgets.updatedText(data)));
-        int text = Widgets.color(data, "text", 0xFFCFE3D3);
-        int accent = Widgets.color(data, "accent", 0xFF7DFF72);
-        views.setTextColor(R.id.empty, Widgets.color(data, "dim", 0xFF6F8A76));
+        Widgets.paint(context, views, R.id.empty, "setTextColor", data, "dim");
 
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
         double[] amounts = place == null ? new double[0] : data.amounts(place.code);
@@ -67,8 +65,8 @@ public class ReferenceWidget extends AppWidgetProvider {
             if (!show) continue;
             views.setTextViewText(FROM[i], Widgets.text(data, data.formatAmount(amounts[i], place.code)));
             views.setTextViewText(TO[i], Widgets.text(data, data.formatResult(data.convert(amounts[i], place.code, data.home()), data.home())));
-            views.setTextColor(FROM[i], text);
-            views.setTextColor(TO[i], accent);
+            Widgets.paint(context, views, FROM[i], "setTextColor", data, "text");
+            Widgets.paint(context, views, TO[i], "setTextColor", data, "accent");
         }
         return views;
     }

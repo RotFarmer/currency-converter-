@@ -17,38 +17,46 @@ import java.util.Map;
 import org.json.JSONObject;
 
 /**
- * The theme's look for the widgets. The web app sends the theme's art as images (js/app.js, widgetArtPayload):
- * a backdrop that fills the widget, scenery along the bottom, a strip along the top edge and corner ornaments,
- * with the corner radius, border and font. Here the images are saved and composed into a background bitmap the
+ * The theme's look for the widgets. The web app sends the theme's art as images (js/app.js, widgetArtPayload),
+ * a light and a dark set: a backdrop that fills the widget, scenery along the bottom, a strip along the top edge
+ * and corner ornaments, with the corner radius, border and font. Here the images are saved and composed into a background bitmap the
  * size of each widget, so the art fits however the widget is resized.
  */
 final class WidgetArt {
 
+    private static final String[] MODES = { "light", "dark" };
     private static final String[] LAYERS = { "backdrop", "strip", "topper", "corner" };
-    /** Composed backgrounds by art id and size; each is up to a couple of MB, so keep a few. */
-    private static final LruCache<String, Bitmap> FRAMES = new LruCache<>(6);
+    /** Composed backgrounds by art id, look and size; each is up to a couple of MB, so keep a few. */
+    private static final LruCache<String, Bitmap> FRAMES = new LruCache<>(8);
     private static final Map<String, Bitmap> LAYER_CACHE = new HashMap<>();
     private static String cachedArtId;
 
     private WidgetArt() {}
 
-    /** Saves the images the app sent, one file per layer, and returns the art's description without them. */
+    /**
+     * Saves the images the app sent, one file per look (light, dark) and layer, and returns the art's description
+     * without them.
+     */
     static JSONObject save(Context context, JSONObject art) throws Exception {
         JSONObject meta = new JSONObject(art.toString());
-        for (String name : LAYERS) {
-            File file = file(context, name);
-            Object layer = art.opt(name);
-            String data = layer instanceof JSONObject ? ((JSONObject) layer).optString("png", "") : layer instanceof String ? (String) layer : "";
-            if (data.isEmpty()) {
-                file.delete();
-                meta.remove(name);
-                continue;
+        for (String mode : MODES) {
+            JSONObject layers = art.optJSONObject(mode);
+            JSONObject layersMeta = meta.optJSONObject(mode);
+            for (String name : LAYERS) {
+                File file = file(context, mode, name);
+                Object layer = layers == null ? null : layers.opt(name);
+                String data = layer instanceof JSONObject ? ((JSONObject) layer).optString("png", "") : layer instanceof String ? (String) layer : "";
+                if (data.isEmpty()) {
+                    file.delete();
+                    if (layersMeta != null) layersMeta.remove(name);
+                    continue;
+                }
+                try (FileOutputStream out = new FileOutputStream(file)) {
+                    out.write(Base64.decode(data, Base64.DEFAULT));
+                }
+                if (layer instanceof JSONObject) layersMeta.getJSONObject(name).remove("png");
+                else layersMeta.put(name, true);
             }
-            try (FileOutputStream out = new FileOutputStream(file)) {
-                out.write(Base64.decode(data, Base64.DEFAULT));
-            }
-            if (layer instanceof JSONObject) meta.getJSONObject(name).remove("png");
-            else meta.put(name, true);
         }
         synchronized (WidgetArt.class) {
             FRAMES.evictAll();
@@ -62,11 +70,13 @@ final class WidgetArt {
         return data == null ? null : data.json.optJSONObject("artMeta");
     }
 
-    /** The background for a widget of this size in dp, or null when the theme has no widget art. */
-    static synchronized Bitmap frame(Context context, WidgetData data, int widthDp, int heightDp) {
+    /** The light or dark background for a widget of this size in dp, or null when the theme has no widget art. */
+    static synchronized Bitmap frame(Context context, WidgetData data, int widthDp, int heightDp, boolean night) {
         JSONObject meta = meta(data);
-        if (meta == null || !meta.has("backdrop")) return null;
-        String id = meta.optString("id");
+        String mode = night ? "dark" : "light";
+        JSONObject layers = meta == null ? null : meta.optJSONObject(mode);
+        if (layers == null || !layers.has("backdrop")) return null;
+        String id = meta.optString("id") + ":" + mode;
         // At most twice the dp size: sharp enough, and small enough to hand to the home screen.
         float scale = Math.min(context.getResources().getDisplayMetrics().density, 2f);
         int w = Math.max(1, Math.round(widthDp * scale));
@@ -85,12 +95,12 @@ final class WidgetArt {
 
         canvas.save();
         canvas.clipPath(clip);
-        canvas.drawColor(data.color("bg", 0xFF040605));
-        Bitmap backdrop = layer(context, id, "backdrop");
+        canvas.drawColor(data.color("bg", 0xFF040605, night));
+        Bitmap backdrop = layer(context, id, mode, "backdrop");
         if (backdrop != null) drawCover(canvas, backdrop, w, h, paint);
 
-        JSONObject strip = meta.optJSONObject("strip");
-        Bitmap stripArt = strip == null ? null : layer(context, id, "strip");
+        JSONObject strip = layers.optJSONObject("strip");
+        Bitmap stripArt = strip == null ? null : layer(context, id, mode, "strip");
         if (stripArt != null) {
             // Full width, anchored to the bottom; if it would be too tall, its top is cut off.
             float fullHeight = stripArt.getHeight() * (w / (float) stripArt.getWidth());
@@ -101,16 +111,16 @@ final class WidgetArt {
             paint.setAlpha(255);
         }
 
-        JSONObject topper = meta.optJSONObject("topper");
-        Bitmap topperArt = topper == null ? null : layer(context, id, "topper");
+        JSONObject topper = layers.optJSONObject("topper");
+        Bitmap topperArt = topper == null ? null : layer(context, id, mode, "topper");
         if (topperArt != null) {
             float th = (float) topper.optDouble("height", 8) * scale;
             float tw = topperArt.getWidth() * th / topperArt.getHeight();
             for (float x = 0; x < w; x += tw) canvas.drawBitmap(topperArt, null, new RectF(x, 0, x + tw, th), paint);
         }
 
-        JSONObject corner = meta.optJSONObject("corner");
-        Bitmap cornerArt = corner == null ? null : layer(context, id, "corner");
+        JSONObject corner = layers.optJSONObject("corner");
+        Bitmap cornerArt = corner == null ? null : layer(context, id, mode, "corner");
         if (cornerArt != null) {
             float size = (float) corner.optDouble("size", 20) * scale;
             float inset = border + 2 * scale;
@@ -131,7 +141,7 @@ final class WidgetArt {
         }
         canvas.restore();
 
-        drawBorder(canvas, meta.optString("borderStyle", "single"), border, radius, w, h, data.color("line", 0xFF2A5636), scale);
+        drawBorder(canvas, meta.optString("borderStyle", "single"), border, radius, w, h, data.color("line", 0xFF2A5636, night), scale);
         FRAMES.put(key, out);
         return out;
     }
@@ -177,19 +187,21 @@ final class WidgetArt {
         canvas.drawBitmap(image, null, new RectF((w - dw) / 2, (h - dh) / 2, (w + dw) / 2, (h + dh) / 2), paint);
     }
 
-    private static Bitmap layer(Context context, String artId, String name) {
+    private static Bitmap layer(Context context, String frameId, String mode, String name) {
+        String artId = frameId.substring(0, frameId.lastIndexOf(':'));
         if (!artId.equals(cachedArtId)) {
             LAYER_CACHE.clear();
             cachedArtId = artId;
         }
-        if (LAYER_CACHE.containsKey(name)) return LAYER_CACHE.get(name);
-        File file = file(context, name);
+        String key = mode + "-" + name;
+        if (LAYER_CACHE.containsKey(key)) return LAYER_CACHE.get(key);
+        File file = file(context, mode, name);
         Bitmap bitmap = file.isFile() ? BitmapFactory.decodeFile(file.getPath()) : null;
-        LAYER_CACHE.put(name, bitmap);
+        LAYER_CACHE.put(key, bitmap);
         return bitmap;
     }
 
-    private static File file(Context context, String name) {
-        return new File(context.getFilesDir(), "widget-art-" + name);
+    private static File file(Context context, String mode, String name) {
+        return new File(context.getFilesDir(), "widget-art-" + mode + "-" + name);
     }
 }

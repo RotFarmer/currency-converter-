@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Converter widget key (pill), for themes that like that shape. -->
+<!-- Converter widget key (pill-shaped): see-through grey, which shows on light and dark looks alike. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
             <corners android:radius="999dp" />
-            <solid android:color="#2B000000" />
+            <solid android:color="#66808080" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="999dp" />
-            <solid android:color="#0F000000" />
+            <solid android:color="#30808080" />
         </shape>
     </item>
 </selector>

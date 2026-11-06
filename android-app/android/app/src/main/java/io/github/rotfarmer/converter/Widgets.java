@@ -6,8 +6,11 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -54,25 +57,74 @@ final class Widgets {
      * background is a bitmap composed at this widget's size; otherwise a rounded panel in the theme's colours.
      */
     static void paintFrame(Context context, RemoteViews views, WidgetData data, AppWidgetManager manager, int widgetId, int defaultWidthDp, int defaultHeightDp) {
-        int bg = color(data, "bg", 0xFF040605);
-        int line = color(data, "line", 0xFF2A5636);
         int[] size = sizeDp(manager, widgetId, defaultWidthDp, defaultHeightDp);
-        Bitmap art = WidgetArt.frame(context, data, size[0], size[1]);
-        if (art != null) {
-            views.setImageViewBitmap(R.id.widget_bg, art);
+        boolean hasArt = false;
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Both looks: the home screen shows the one that suits the phone's dark mode, and switches by itself.
+            Bitmap light = WidgetArt.frame(context, data, size[0], size[1], false);
+            Bitmap dark = light == null ? null : WidgetArt.frame(context, data, size[0], size[1], true);
+            if (dark != null) {
+                views.setIcon(R.id.widget_bg, "setImageIcon", Icon.createWithBitmap(light), Icon.createWithBitmap(dark));
+                hasArt = true;
+            }
+        } else {
+            Bitmap art = WidgetArt.frame(context, data, size[0], size[1], isNight(context));
+            if (art != null) {
+                views.setImageViewBitmap(R.id.widget_bg, art);
+                hasArt = true;
+            }
+        }
+        if (hasArt) {
             views.setInt(R.id.widget_bg, "setColorFilter", 0);
             views.setViewVisibility(R.id.widget_border, View.GONE);
         } else {
             views.setImageViewResource(R.id.widget_bg, R.drawable.widget_bg);
-            views.setInt(R.id.widget_bg, "setColorFilter", bg);
+            paint(context, views, R.id.widget_bg, "setColorFilter", data, "bg");
             views.setViewVisibility(R.id.widget_border, View.VISIBLE);
-            views.setInt(R.id.widget_border, "setColorFilter", line);
+            paint(context, views, R.id.widget_border, "setColorFilter", data, "line");
         }
-        views.setInt(R.id.marker, "setColorFilter", color(data, "accent", 0xFF7DFF72));
-        views.setInt(R.id.divider, "setColorFilter", line);
-        views.setTextColor(R.id.title, color(data, "text", 0xFFCFE3D3));
-        views.setTextColor(R.id.pair, color(data, "accent", 0xFF7DFF72));
-        views.setTextColor(R.id.updated, color(data, "dim", 0xFF6F8A76));
+        paint(context, views, R.id.marker, "setColorFilter", data, "accent");
+        paint(context, views, R.id.divider, "setColorFilter", data, "line");
+        paint(context, views, R.id.title, "setTextColor", data, "text");
+        paint(context, views, R.id.pair, "setTextColor", data, "accent");
+        paint(context, views, R.id.updated, "setTextColor", data, "dim");
+    }
+
+    /**
+     * Gives a view one of the theme's colours (bg, text, dim, accent, line) through a method taking a colour, such
+     * as setTextColor or setColorFilter. From Android 12 it gets both the light and the dark version and the home
+     * screen picks the one for the phone's dark mode; before that, the one for the mode the phone is in now.
+     */
+    static void paint(Context context, RemoteViews views, int viewId, String method, WidgetData data, String key) {
+        int fallback = fallbackColor(key);
+        if (data == null) {
+            views.setInt(viewId, method, fallback);
+        } else if (Build.VERSION.SDK_INT >= 31) {
+            views.setColorInt(viewId, method, data.color(key, fallback, false), data.color(key, fallback, true));
+        } else {
+            views.setInt(viewId, method, data.color(key, fallback, isNight(context)));
+        }
+    }
+
+    static int fallbackColor(String key) {
+        switch (key) {
+            case "bg":
+                return 0xFF040605;
+            case "dim":
+                return 0xFF6F8A76;
+            case "accent":
+                return 0xFF7DFF72;
+            case "line":
+                return 0xFF2A5636;
+            default:
+                return 0xFFCFE3D3;
+        }
+    }
+
+    /** Whether the phone is in dark mode. */
+    static boolean isNight(Context context) {
+        Configuration config = context.getResources().getConfiguration();
+        return (config.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
     /** The widget's size in dp (portrait: its width and the height the launcher gives it). */
@@ -93,18 +145,16 @@ final class Widgets {
         return styled;
     }
 
-    /** The keypad's keys: square, rounded or pill-shaped as the theme likes, light or dark to suit its colours. */
+    /**
+     * The keypad's keys: square, rounded or pill-shaped as the theme likes. They're a see-through grey, which shows
+     * on light and dark looks alike, so they suit the widget in either of the phone's modes.
+     */
     static int keyBackground(WidgetData data) {
-        boolean dark = WidgetData.isDark(color(data, "bg", 0xFF040605));
         JSONObject meta = WidgetArt.meta(data);
         String shape = meta == null ? "round" : meta.optString("keys", "round");
-        if ("square".equals(shape)) return dark ? R.drawable.widget_key_dark_square : R.drawable.widget_key_light_square;
-        if ("pill".equals(shape)) return dark ? R.drawable.widget_key_dark_pill : R.drawable.widget_key_light_pill;
-        return dark ? R.drawable.widget_key_dark : R.drawable.widget_key_light;
-    }
-
-    static int color(WidgetData data, String key, int fallback) {
-        return data == null ? fallback : data.color(key, fallback);
+        if ("square".equals(shape)) return R.drawable.widget_key_square;
+        if ("pill".equals(shape)) return R.drawable.widget_key_pill;
+        return R.drawable.widget_key;
     }
 
     /** How old the rates are, short enough for the corner: "now", "12m", "3h", "2d". Tap it to refresh. */

@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v25'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v26'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -135,14 +135,11 @@ function rememberScan(items, currencyFor, labelFor, at) {
   syncWidget();
 }
 
-/** The widget art for the current theme and mode (see js/widget-art.js), loaded when first needed. */
+/** The widget art for the current theme (see js/widget-art.js), loaded when first needed. */
 let widgetArtTable = null;
 let lastArtSent = '';
 
-async function currentWidgetArt(accent) {
-  const skin = skinById(settings.skin).id;
-  const dark = skinById(settings.skin).mode ? skinById(settings.skin).mode === 'dark' : settings.theme === 'dark' || (settings.theme !== 'light' && darkQuery.matches);
-  const mode = dark ? 'dark' : 'light';
+async function loadWidgetArt() {
   if (!widgetArtTable) {
     try {
       widgetArtTable = (await import('./widget-art.js')).WIDGET_ART;
@@ -150,9 +147,15 @@ async function currentWidgetArt(accent) {
       return null;
     }
   }
-  const spec = widgetArtTable[skin];
+  return widgetArtTable;
+}
+
+/** The current theme's widget art, light and dark (each with its accent colour, which HUD art is drawn in). */
+async function currentWidgetArt(accents) {
+  const skin = skinById(settings.skin).id;
+  const spec = (await loadWidgetArt())?.[skin];
   if (!spec) return null;
-  return { id: `${skin}-${mode}-${accent}`, spec, layers: spec[mode] || spec.dark || spec.light };
+  return { id: `${skin}-${accents.light}-${accents.dark}`, spec, accents };
 }
 
 /** An SVG drawn into a PNG, or a JPEG for opaque backgrounds (base64), for Android, which can't draw SVG itself. */
@@ -167,26 +170,96 @@ async function rasterize(svg, width, height, type = 'image/png') {
   return canvas.toDataURL(type, 0.86).split(',')[1];
 }
 
-/** The theme's widget frame and layers as images: sent once per theme change, kept by the widgets. */
-async function widgetArtPayload(art, accent) {
-  const { spec, layers } = art;
+/** One look's layers as images: backdrop (JPEG), strip, topper and corner (PNG). */
+async function widgetLayersPayload(layers, accent) {
   const svg = (text) => text.replaceAll('{accent}', accent);
-  const out = { id: art.id, radius: spec.radius, border: spec.border, borderStyle: spec.borderStyle, font: spec.font, keys: spec.keys };
-  out.backdrop = await rasterize(svg(layers.backdrop), 480, 480, 'image/jpeg');
+  const out = { backdrop: await rasterize(svg(layers.backdrop), 480, 480, 'image/jpeg') };
   if (layers.strip) out.strip = { png: await rasterize(svg(layers.strip.svg), 800, (800 * layers.strip.h) / layers.strip.w), opacity: layers.strip.opacity, maxHeight: layers.strip.maxHeight };
   if (layers.topper) out.topper = { png: await rasterize(svg(layers.topper.svg), layers.topper.w * 3, layers.topper.h * 3), height: layers.topper.height };
   if (layers.corner) out.corner = { png: await rasterize(svg(layers.corner.svg), 96, 96), size: layers.corner.size };
   return out;
 }
 
-async function sendWidgetData() {
-  const rates = getRates();
-  const { home } = settings;
-  const css = getComputedStyle(document.documentElement);
+async function widgetArtPayload(art) {
+  const { spec, accents } = art;
+  return {
+    id: art.id,
+    radius: spec.radius,
+    border: spec.border,
+    borderStyle: spec.borderStyle,
+    font: spec.font,
+    keys: spec.keys,
+    light: await widgetLayersPayload(spec.light || spec.dark, accents.light),
+    dark: await widgetLayersPayload(spec.dark || spec.light, accents.dark),
+  };
+}
+
+/*
+ * The widgets follow the phone's dark mode, whatever the app itself shows, so they need the theme's colours in
+ * both modes. They're read in a hidden frame with the same stylesheets, so the page itself never changes.
+ */
+let colorProbe = null;
+
+function themeProbe() {
+  colorProbe ||= new Promise((resolve) => {
+    const frame = document.createElement('iframe');
+    frame.hidden = true;
+    frame.tabIndex = -1;
+    frame.setAttribute('aria-hidden', 'true');
+    const links = $$('link[rel="stylesheet"]')
+      .filter((link) => link.href.startsWith(location.origin))
+      .map((link) => `<link rel="stylesheet" href="${link.href}">`)
+      .join('');
+    frame.srcdoc = `<!doctype html><html><head>${links}</head><body></body></html>`;
+    const timer = setTimeout(() => resolve(null), 4000);
+    frame.addEventListener('load', () => {
+      clearTimeout(timer);
+      resolve(frame);
+    }, { once: true });
+    document.body.append(frame);
+  });
+  return colorProbe;
+}
+
+/** A theme's widget colours (a theme can set --widget-…; otherwise its panels' colours), from computed styles. */
+function widgetColorsFrom(css) {
   const color = (name, fallback) => {
     const value = css.getPropertyValue(name).trim();
     return value ? hexColor(value, fallback || '#000000') : fallback;
   };
+  return {
+    bg: color('--widget-bg', '') || color('--panel', '#040605'),
+    text: color('--widget-text', '') || color('--text', '#cfe3d3'),
+    dim: color('--widget-dim', '') || color('--text-faint', '#6f8a76'),
+    accent: color('--widget-accent', '') || color('--accent', '#7dff72'),
+    line: color('--widget-line', '') || color('--line-strong', '#2a5636'),
+  };
+}
+
+/** The current theme's widget colours in light or dark mode. */
+async function widgetColorsFor(mode) {
+  const skin = skinById(settings.skin);
+  // Themes that only come in one mode have widget colours of their own for the other (js/widget-art.js).
+  if (skin.mode && skin.mode !== mode) {
+    const own = (await loadWidgetArt())?.[skin.id]?.[mode]?.colors;
+    if (own) return own;
+  }
+  const frame = await themeProbe();
+  const root = frame?.contentDocument?.documentElement;
+  if (!root) return widgetColorsFrom(getComputedStyle(document.documentElement));
+  const hud = skin.id === 'hud';
+  for (const name of ['skin', 'mode', 'theme']) delete root.dataset[name];
+  if (!hud) root.dataset.skin = skin.id;
+  if (!hud) root.dataset.mode = skin.mode || mode;
+  root.dataset.theme = skin.mode || mode;
+  const color = accentColor();
+  root.style.cssText = hud && color ? toCssText(accentPalette(color, mode === 'dark')) : '';
+  return widgetColorsFrom(frame.contentWindow.getComputedStyle(root));
+}
+
+async function sendWidgetData() {
+  const rates = getRates();
+  const { home } = settings;
   const money = {};
   for (const { code } of CURRENCIES) {
     if (rates && !rates.rates[code]) continue;
@@ -207,24 +280,21 @@ async function sendWidgetData() {
     ratesUpdatedAt: rates?.updatedAt || 0,
     ratesFetchedAt: rates?.fetchedAt || 0,
     ...(settings.autoSource ? getZoneTables() : {}),
-    // A theme can give its widgets their own colours (--widget-…); otherwise they match its panels.
-    colors: {
-      bg: color('--widget-bg', '') || color('--panel', '#040605'),
-      text: color('--widget-text', '') || color('--text', '#cfe3d3'),
-      dim: color('--widget-dim', '') || color('--text-faint', '#6f8a76'),
-      accent: color('--widget-accent', '') || color('--accent', '#7dff72'),
-      line: color('--widget-line', '') || color('--line-strong', '#2a5636'),
-    },
+    // The colours the app shows now, and the theme's light and dark colours, which the widgets switch between
+    // with the phone's dark mode.
+    colors: widgetColorsFrom(getComputedStyle(document.documentElement)),
+    colorsLight: await widgetColorsFor('light'),
+    colorsDark: await widgetColorsFor('dark'),
   };
-  // The theme's look for the widgets: art images go along only when the theme (or mode, or HUD accent) changed.
-  const art = await currentWidgetArt(data.colors.accent);
+  // The theme's look for the widgets: art images go along only when the theme (or HUD accent) changed.
+  const art = await currentWidgetArt({ light: data.colorsLight.accent, dark: data.colorsDark.accent });
   data.artId = art ? art.id : null;
   const json = JSON.stringify(data);
   if (json === lastWidgetData && data.artId === lastArtSent) return;
   lastWidgetData = json;
   if (art && art.id !== lastArtSent) {
     try {
-      data.art = await widgetArtPayload(art, data.colors.accent);
+      data.art = await widgetArtPayload(art);
     } catch {
       // The widgets keep their plain look.
     }
@@ -476,6 +546,104 @@ function showTab(tab) {
   $('#view-code').textContent = TABS[tab][1];
   if (tab === 'scan') warmUpOcr();
 }
+
+/* ---------- Swiping between pages ---------- */
+// Swipe left or right anywhere on a page to go to the next or previous tab. The page follows the finger and the
+// next one slides in. Places that scroll sideways themselves (the quick reference pages and tabs), text fields
+// and the ☰ drag handles keep their own gestures.
+
+const TAB_ORDER = Object.keys(TABS);
+const SWIPE_IGNORE = 'input, textarea, select, .ref-track, .ref-tabs, .row-handle, [data-no-swipe]';
+let swipe = null;
+let swipeEndedAt = -Infinity;
+
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const currentView = () => $(`.view[data-view="${currentTab}"]`);
+
+/** Switch tab with a slide: the new page comes in from the side it's on (direction 1 = from the right). */
+function slideToTab(tab, direction = Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(currentTab))) {
+  if (tab === currentTab) return;
+  showTab(tab);
+  if (!direction || reduceMotion()) return;
+  currentView().animate(
+    [
+      { transform: `translate3d(${direction * 28}%, 0, 0)`, opacity: 0 },
+      { transform: 'none', opacity: 1 },
+    ],
+    { duration: 260, easing: 'cubic-bezier(.2, .8, .2, 1)' },
+  );
+}
+
+function setSwipeOffset(dx) {
+  const view = currentView();
+  if (!dx) {
+    view.style.transform = view.style.opacity = '';
+    return;
+  }
+  view.style.transform = `translate3d(${dx}px, 0, 0)`;
+  view.style.opacity = String(1 - Math.min(0.6, Math.abs(dx) / innerWidth));
+}
+
+function endSwipe(event, cancelled) {
+  if (!swipe || event.pointerId !== swipe.id) return;
+  const { dx, active, velocity } = swipe;
+  swipe = null;
+  if (!active) return;
+  swipeEndedAt = performance.now();
+  document.documentElement.classList.remove('swiping');
+  const next = TAB_ORDER[TAB_ORDER.indexOf(currentTab) + (dx < 0 ? 1 : -1)];
+  const far = Math.abs(dx) > innerWidth * 0.28 || (Math.abs(dx) > 40 && Math.abs(velocity) > 0.45 && Math.sign(velocity) === Math.sign(dx));
+  if (cancelled || !next || !far) {
+    // Not far enough: spring back.
+    const view = currentView();
+    const from = view.style.transform;
+    setSwipeOffset(0);
+    if (from && !reduceMotion()) view.animate([{ transform: from }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+    return;
+  }
+  setSwipeOffset(0);
+  slideToTab(next, dx < 0 ? 1 : -1);
+}
+
+const mainArea = $('main');
+mainArea.addEventListener('pointerdown', (event) => {
+  if (!event.isPrimary || event.pointerType === 'mouse' || drag || event.target.closest(SWIPE_IGNORE)) return;
+  swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, t: event.timeStamp, dx: 0, velocity: 0, active: false };
+});
+mainArea.addEventListener('pointermove', (event) => {
+  if (!swipe || event.pointerId !== swipe.id) return;
+  const dx = event.clientX - swipe.x;
+  const dy = event.clientY - swipe.y;
+  if (!swipe.active) {
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
+      swipe = null; // scrolling up or down
+      return;
+    }
+    if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    swipe.active = true;
+    swipe.x = event.clientX - Math.sign(dx) * 14;
+    mainArea.setPointerCapture(event.pointerId);
+    document.documentElement.classList.add('swiping');
+    getSelection()?.removeAllRanges();
+  }
+  const raw = event.clientX - swipe.x;
+  const elapsed = Math.max(1, event.timeStamp - swipe.t);
+  swipe.velocity = (raw - swipe.dx) / elapsed;
+  swipe.t = event.timeStamp;
+  swipe.dx = raw;
+  // At the first and last page the page only gives a little, like pulling on a rubber band.
+  const hasNext = TAB_ORDER[TAB_ORDER.indexOf(currentTab) + (raw < 0 ? 1 : -1)];
+  setSwipeOffset(hasNext ? raw : raw * 0.22);
+});
+mainArea.addEventListener('pointerup', (event) => endSwipe(event, false));
+mainArea.addEventListener('pointercancel', (event) => endSwipe(event, true));
+// A swipe that moved the page isn't also a tap on whatever it started on.
+mainArea.addEventListener('click', (event) => {
+  if (performance.now() - swipeEndedAt < 400) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+}, true);
 
 /* ---------- Sheets (picker, price editor) ---------- */
 // Each open sheet adds a history entry so the Android back button closes it.
@@ -2028,7 +2196,7 @@ function toast(message) {
 
 $('.tabbar').addEventListener('click', (event) => {
   const button = event.target.closest('[data-tab]');
-  if (button) showTab(button.dataset.tab);
+  if (button) slideToTab(button.dataset.tab);
 });
 
 document.addEventListener('click', (event) => {

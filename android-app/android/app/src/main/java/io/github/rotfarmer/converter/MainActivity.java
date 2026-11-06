@@ -1,6 +1,8 @@
 package io.github.rotfarmer.converter;
 
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -41,6 +43,13 @@ public class MainActivity extends BridgeActivity {
         super.onStop();
         visible = false;
         if (Updater.canUpdateQuietly(this)) handler.postDelayed(installWhenAway, INSTALL_AFTER_LEAVING_MS);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Dark mode switched on or off: before Android 12 the widgets only have one look, so draw them again.
+        if (Build.VERSION.SDK_INT < 31) new Thread(() -> Widgets.renderAll(getApplicationContext())).start();
     }
 
     static boolean isVisible() {

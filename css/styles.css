@@ -264,7 +264,9 @@ strong { color: var(--accent); font-weight: 400; }
 .rates-pill[data-state="error"] .dot { background: var(--danger); }
 .rates-pill[data-state="loading"] .dot { background: var(--accent); animation: blink 0.8s steps(2) infinite; }
 
-main { padding: 16px 16px 0; }
+main { padding: 16px 16px 0; overflow-x: clip; touch-action: pan-y pinch-zoom; }
+.swiping main { user-select: none; -webkit-user-select: none; }
+.swiping main .view { will-change: transform, opacity; }
 .view, .stack { display: flex; flex-direction: column; gap: 14px; }
 
 /* ---------- Panels: angular, thin border, one lit corner ---------- */

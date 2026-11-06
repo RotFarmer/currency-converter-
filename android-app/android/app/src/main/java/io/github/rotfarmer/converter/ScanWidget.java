@@ -39,18 +39,15 @@ public class ScanWidget extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.updated, Widgets.refresh(context));
         views.setTextViewText(R.id.updated, Widgets.text(data, Widgets.updatedText(data)));
 
-        int text = Widgets.color(data, "text", 0xFFCFE3D3);
-        int accent = Widgets.color(data, "accent", 0xFF7DFF72);
-        int dim = Widgets.color(data, "dim", 0xFF6F8A76);
-        views.setInt(R.id.scan_button_bg, "setColorFilter", accent);
-        views.setInt(R.id.scan_icon, "setColorFilter", accent);
+        Widgets.paint(context, views, R.id.scan_button_bg, "setColorFilter", data, "accent");
+        Widgets.paint(context, views, R.id.scan_icon, "setColorFilter", data, "accent");
         views.setTextViewText(R.id.scan_label, Widgets.text(data, context.getString(R.string.scan_button)));
         views.setTextViewText(R.id.scan_hint, Widgets.text(data, context.getString(R.string.scan_button_hint)));
         views.setTextViewText(R.id.scan_empty, Widgets.text(data, context.getString(R.string.scan_empty)));
-        views.setTextColor(R.id.scan_label, accent);
-        views.setTextColor(R.id.scan_hint, dim);
-        views.setTextColor(R.id.last_title, dim);
-        views.setTextColor(R.id.scan_empty, dim);
+        Widgets.paint(context, views, R.id.scan_label, "setTextColor", data, "accent");
+        Widgets.paint(context, views, R.id.scan_hint, "setTextColor", data, "dim");
+        Widgets.paint(context, views, R.id.last_title, "setTextColor", data, "dim");
+        Widgets.paint(context, views, R.id.scan_empty, "setTextColor", data, "dim");
 
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
         String label = place == null ? null : place.label();
@@ -86,8 +83,8 @@ public class ScanWidget extends AppWidgetProvider {
             views.setViewVisibility(ROWS[i], View.VISIBLE);
             views.setTextViewText(LABELS[i], Widgets.text(data, name == null ? "" : name));
             views.setTextViewText(VALUES[i], Widgets.text(data, value));
-            views.setTextColor(LABELS[i], text);
-            views.setTextColor(VALUES[i], accent);
+            Widgets.paint(context, views, LABELS[i], "setTextColor", data, "text");
+            Widgets.paint(context, views, VALUES[i], "setTextColor", data, "accent");
         }
         return views;
     }

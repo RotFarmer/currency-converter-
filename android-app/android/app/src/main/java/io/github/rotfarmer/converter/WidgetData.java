@@ -174,8 +174,10 @@ final class WidgetData {
         return json.optLong("ratesFetchedAt", ratesUpdatedAt());
     }
 
-    int color(String key, int fallback) {
-        String value = str(json.optJSONObject("colors"), key);
+    /** The theme's colour for the light (night = false) or dark look; older data has one set for both. */
+    int color(String key, int fallback, boolean night) {
+        JSONObject colors = json.optJSONObject(night ? "colorsDark" : "colorsLight");
+        String value = str(colors != null ? colors : json.optJSONObject("colors"), key);
         if (value == null) return fallback;
         try {
             return Color.parseColor(value);
@@ -194,11 +196,6 @@ final class WidgetData {
         if (object == null || key == null || !object.has(key) || object.isNull(key)) return null;
         String value = object.optString(key, "");
         return value.isEmpty() ? null : value;
-    }
-
-    static boolean isDark(int color) {
-        double luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255;
-        return luminance < 0.5;
     }
 
     /** A currency and the country it's for (null when unknown). */

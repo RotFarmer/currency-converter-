@@ -54,14 +54,12 @@ public class ConverterWidget extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.updated, Widgets.refresh(context));
         views.setTextViewText(R.id.updated, Widgets.text(data, Widgets.updatedText(data)));
 
-        int text = Widgets.color(data, "text", 0xFFCFE3D3);
-        int accent = Widgets.color(data, "accent", 0xFF7DFF72);
         int keyBackground = Widgets.keyBackground(data);
         for (int i = 0; i < KEYS.length; i++) {
             views.setOnClickPendingIntent(KEY_IDS[i], Widgets.key(context, widgetId, KEYS[i]));
             views.setInt(KEY_IDS[i], "setBackgroundResource", keyBackground);
             views.setTextViewText(KEY_IDS[i], Widgets.text(data, LABELS[i]));
-            views.setTextColor(KEY_IDS[i], KEYS[i].length() > 2 ? accent : text);
+            Widgets.paint(context, views, KEY_IDS[i], "setTextColor", data, KEYS[i].length() > 2 ? "accent" : "text");
         }
         fillDisplay(context, views, widgetId, data);
         return views;
@@ -69,17 +67,14 @@ public class ConverterWidget extends AppWidgetProvider {
 
     /** The title, the currencies and the two amounts: all that changes when a key is tapped. */
     private static void fillDisplay(Context context, RemoteViews views, int widgetId, WidgetData data) {
-        int text = Widgets.color(data, "text", 0xFFCFE3D3);
-        int accent = Widgets.color(data, "accent", 0xFF7DFF72);
-        int dim = Widgets.color(data, "dim", 0xFF6F8A76);
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
         if (place == null) {
             views.setTextViewText(R.id.title, Widgets.text(data, context.getString(R.string.converter_title)));
             views.setTextViewText(R.id.pair, "");
             views.setTextViewText(R.id.input, "—");
-            views.setTextColor(R.id.input, dim);
+            Widgets.paint(context, views, R.id.input, "setTextColor", data, "dim");
             views.setTextViewText(R.id.output, Widgets.text(data, context.getString(data == null ? R.string.widget_setup_short : R.string.widget_no_currency_short)));
-            views.setTextColor(R.id.output, dim);
+            Widgets.paint(context, views, R.id.output, "setTextColor", data, "dim");
             return;
         }
         SharedPreferences prefs = WidgetData.prefs(context);
@@ -92,9 +87,9 @@ public class ConverterWidget extends AppWidgetProvider {
         views.setTextViewText(R.id.pair, Widgets.text(data, from + " → " + to));
         double value = typed.isEmpty() ? 0 : Double.parseDouble(typed);
         views.setTextViewText(R.id.input, Widgets.text(data, typed.isEmpty() ? data.format(0, from, 0) : data.formatTyped(typed, from)));
-        views.setTextColor(R.id.input, typed.isEmpty() ? dim : text);
+        Widgets.paint(context, views, R.id.input, "setTextColor", data, typed.isEmpty() ? "dim" : "text");
         views.setTextViewText(R.id.output, Widgets.text(data, "= " + data.formatResult(data.convert(value, from, to), to)));
-        views.setTextColor(R.id.output, accent);
+        Widgets.paint(context, views, R.id.output, "setTextColor", data, "accent");
     }
 
     /** A key was tapped on a converter widget: only the display is redrawn, so typing stays quick. */
