@@ -1,6 +1,6 @@
 # Currency Converter
 
-A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with twelve whole-app themes, from the default mech-HUD look to an animated aurora, medieval parchment, an autumn forest, the ocean and Windows 95. On Android it is also a real app with two home-screen widgets: a keypad converter and a quick reference table.
+A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with twelve whole-app themes, from the default mech-HUD look to an animated aurora, medieval parchment, an autumn forest, the ocean and Windows 95. On Android it is also a real app with three home-screen widgets: a keypad converter, a quick reference table and a one-tap live camera.
 
 - **Themes.** Settings → Appearance → Theme changes the fonts, colours and the shape of every panel, button and switch:
   - **HUD** (default): phosphor green mech HUD. Pick an accent colour (presets or any colour), turn scanlines, grid and glow on or off, and choose the HUD or a clean font.
@@ -50,21 +50,24 @@ Settings → Language has switches for translation and for guessing the currency
 
 ## Android app and widget
 
-On Android you can install Converter as a real app, with two home-screen widgets.
+On Android you can install Converter as a real app, with three home-screen widgets.
 
 1. On your phone, open **https://github.com/RotFarmer/currency-converter-/releases/download/android-latest/Converter.apk**. It downloads the newest version.
 2. Open the downloaded file. The first time, Android asks you to allow installing apps from your browser; allow it, then tap **Install**.
-3. To add a widget: long-press an empty spot on your home screen, tap **Widgets**, find **Converter** and drag one onto the screen. There are two:
+3. To add a widget: long-press an empty spot on your home screen, tap **Widgets**, find **Converter** and drag one onto the screen. There are three:
    - **Converter**: a keypad. Type a price in the currency of the country you're in and see it in your home currency right away. **⇄** flips the direction, **⌫** deletes a digit and **C** clears. Tap the amount to open the app.
    - **Quick reference**: your quick reference table for the currency of the country you're in, with the amounts you chose in the app (Edit on Quick reference). Make it taller to see more rows.
+   - **Scan**: tap it to open the app straight into the live camera. Below the camera button it lists the prices from your last scan (live camera or photo) with their item names, converted to your home currency with the latest rates.
 
-   Both are drawn in your theme's colours and show the country at the top. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
+   You can also long-press the app icon and tap **Live camera**.
+
+   The widgets are drawn in your theme's colours and show the country at the top. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
 
 The app opens the same site as the web version, so updates to the app's features arrive by themselves. You only need to download the APK again when the app or the widgets themselves change. The widgets refresh rates every few hours on their own, even if you don't open the app.
 
 **Updates and the signing key.** Android only installs an update over the old app if both are signed with the same key. To give the app a permanent key, add a repository secret once: on GitHub, open the repository's **Settings → Secrets and variables → Actions → New repository secret**, name it `ANDROID_SIGNING_PASSWORD`, and give it a long password you make up. The next build creates the key, locked with that password, and saves it (encrypted) in `android-app/signing/`. Until then each build is signed with a temporary key, so to install a newer build you remove the old app first, which also clears its settings.
 
-How it's built: `android-app/` is a [Capacitor](https://capacitorjs.com) project. The widgets are native Android code in `android-app/android/app/src/main/java/` (`ConverterWidget.java`, `ReferenceWidget.java`, with shared code in `Widgets.java` and `WidgetData.java`); the web app sends them data through a small plugin (`WidgetBridgePlugin.java`, called from `sendWidgetData` in `js/app.js`). The **Android app** GitHub Actions workflow (`.github/workflows/android.yml`) builds the APK whenever `android-app/` changes and publishes it as the `android-latest` release. You can also run it by hand from the repository's **Actions** tab.
+How it's built: `android-app/` is a [Capacitor](https://capacitorjs.com) project. The widgets are native Android code in `android-app/android/app/src/main/java/` (`ConverterWidget.java`, `ReferenceWidget.java`, `ScanWidget.java`, with shared code in `Widgets.java` and `WidgetData.java`); the web app sends them data through a small plugin (`WidgetBridgePlugin.java`, called from `sendWidgetData` in `js/app.js`). The **Android app** GitHub Actions workflow (`.github/workflows/android.yml`) builds the APK whenever `android-app/` changes and publishes it as the `android-latest` release. You can also run it by hand from the repository's **Actions** tab.
 
 ## Translation
 
@@ -119,7 +122,7 @@ Project layout:
 | `js/timezones.js` | Time zone → country table (generated from the IANA time zone database) |
 | `js/format.js` | Number formatting and parsing |
 | `sw.js` | Service worker for offline use |
-| `android-app/` | The Android app (Capacitor) and its two home-screen widgets |
+| `android-app/` | The Android app (Capacitor) and its three home-screen widgets |
 | `.github/workflows/android.yml` | Builds and publishes the Android APK |
 | `fonts/` | Share Tech Mono and Chakra Petch; `fonts/skins/` holds the theme fonts, loaded only when a theme uses them (all SIL Open Font License) |
 | `tests/` | Unit tests (`node --test`) |

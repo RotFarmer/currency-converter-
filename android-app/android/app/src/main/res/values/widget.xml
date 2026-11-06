@@ -13,4 +13,13 @@
     <string name="widget_no_currency">Choose a “Price in” currency in Converter, or add one with ☰.</string>
     <string name="widget_no_currency_short">Choose “Price in” in Converter</string>
     <string name="widget_refresh">Refresh rates</string>
+    <string name="scan_name">Scan</string>
+    <string name="scan_description">Opens the live camera in one tap and shows the prices from your last scan</string>
+    <string name="scan_title">LIVE SCAN</string>
+    <string name="scan_button">LIVE CAMERA</string>
+    <string name="scan_button_hint">Point at prices</string>
+    <string name="scan_last">LAST SCAN</string>
+    <string name="scan_empty">Prices from your last scan show up here.</string>
+    <string name="shortcut_camera_short">Live camera</string>
+    <string name="shortcut_camera_long">Scan prices with the live camera</string>
 </resources>

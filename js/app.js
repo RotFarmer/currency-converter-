@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v18'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v19'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -118,6 +118,22 @@ function getZoneTables() {
   return zoneTables;
 }
 
+/** The prices from the last scan (photo or live camera), listed by the Scan widget. */
+let lastScan = load('lastScan', null);
+
+function rememberScan(items, currencyFor, labelFor, at) {
+  const list = items
+    .map((item) => ({ amount: item.amount, code: currencyFor(item), label: labelFor(item) || null }))
+    .filter((item) => item.amount > 0 && item.code)
+    .slice(0, 6);
+  if (!list.length) return;
+  const next = { at, items: list };
+  if (JSON.stringify(next) === JSON.stringify(lastScan)) return;
+  lastScan = next;
+  save('lastScan', lastScan);
+  syncWidget();
+}
+
 function sendWidgetData() {
   const rates = getRates();
   const { home } = settings;
@@ -137,6 +153,7 @@ function sendWidgetData() {
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     extra: settings.extra,
     refAmounts: settings.refAmounts || {},
+    lastScan,
     money,
     rates: rates ? rates.rates : {},
     ratesUpdatedAt: rates?.updatedAt || 0,
@@ -1106,6 +1123,7 @@ async function recognise(run) {
     scan.lines = textLines(lines, prices.map((p) => p.bbox));
     assignLabels();
     scan.status = 'done';
+    scan.finishedAt = Date.now();
     ocrWarm = true;
     $('#ocr-status').textContent = '';
   } catch (error) {
@@ -1204,6 +1222,7 @@ function updatePhotoScale() {
 new ResizeObserver(updatePhotoScale).observe(photoWrap);
 
 function renderScan() {
+  if (scan.status === 'done' && scan.finishedAt) rememberScan(scan.items, (item) => currencyOf(item), (item) => translatedLabel(item) || item.label, scan.finishedAt);
   $('#scan-intro').hidden = scan.hasPhoto;
   $('#scan-result').hidden = !scan.hasPhoto;
   $('#scan-progress').hidden = scan.status !== 'reading';
@@ -1497,6 +1516,7 @@ async function liveLoop(session) {
       live.frameW = frame.width;
       live.frameH = frame.height;
       const count = live.items.length;
+      if (count) live.lastSeen = { at: Date.now(), items: live.items };
       setCameraStatus(count ? `${count} price${count === 1 ? '' : 's'}` : 'Point at prices');
       renderLiveTags();
     } catch {
@@ -1534,6 +1554,10 @@ function renderLiveTags() {
 }
 
 cameraEl.addEventListener('sheetclose', () => {
+  // The prices the live camera saw last go to the Scan widget.
+  const seen = live.lastSeen;
+  if (seen && seen.at > (lastScan?.at || 0)) rememberScan(seen.items, (item) => currencyOf(item, seen.items, null), () => null, seen.at);
+  live.lastSeen = null;
   live.session++;
   live.items = [];
   stopCamera(video);
@@ -1859,6 +1883,22 @@ saveSettings();
 applyTheme();
 renderAll();
 if (ratesAreStale()) updateRates();
+
+// Opened from the Scan widget, or "Live camera" on the app icon's long-press menu: go straight to the camera.
+async function handleLaunchAction() {
+  if (!isNativeApp) return;
+  try {
+    const { action } = await window.Capacitor.nativePromise('Widgets', 'takeLaunchAction', {});
+    if (action === 'camera' && cameraEl.hidden) {
+      showTab('scan');
+      openCamera();
+    }
+  } catch {
+    // An older app version without this: nothing to do.
+  }
+}
+window.addEventListener('converterlaunch', handleLaunchAction);
+handleLaunchAction();
 
 // First launch: ask for the home currency (then "prices in" follows the location).
 if (!settings.homeChosen) setTimeout(openHomeChooser, 300);

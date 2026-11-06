@@ -22,6 +22,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
 
         <!-- Home-screen widgets -->
@@ -47,6 +52,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_reference_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ScanWidget"
+            android:exported="false"
+            android:label="@string/scan_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_scan_info" />
         </receiver>
 
         <!-- Taps on the widgets (keypad keys, refresh) -->

@@ -80,7 +80,7 @@
                 android:paddingStart="8dp"
                 android:paddingTop="4dp"
                 android:paddingBottom="4dp"
-                android:text="3h ⟳"
+                android:text="3 hours ago  ⟳"
                 android:textColor="#6F8A76"
                 android:textSize="10sp" />
         </LinearLayout>

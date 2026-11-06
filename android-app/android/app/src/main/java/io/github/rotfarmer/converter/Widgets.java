@@ -29,7 +29,7 @@ final class Widgets {
 
     private Widgets() {}
 
-    /** Redraws every Converter and Quick reference widget on the home screen. */
+    /** Redraws every Converter, Quick reference and Scan widget on the home screen. */
     static void renderAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         WidgetData data = WidgetData.load(context);
@@ -38,6 +38,9 @@ final class Widgets {
         }
         for (int id : manager.getAppWidgetIds(new ComponentName(context, ConverterWidget.class))) {
             manager.updateAppWidget(id, ConverterWidget.build(context, id, data));
+        }
+        for (int id : manager.getAppWidgetIds(new ComponentName(context, ScanWidget.class))) {
+            manager.updateAppWidget(id, ScanWidget.build(context, manager, id, data));
         }
     }
 
@@ -79,6 +82,13 @@ final class Widgets {
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         return PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Opens the app straight into the live camera. */
+    static PendingIntent openCamera(Context context) {
+        Intent intent = new Intent(context, MainActivity.class).setAction(MainActivity.ACTION_OPEN_CAMERA);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(context, 2, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     static PendingIntent refresh(Context context) {

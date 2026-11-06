@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon: "Live camera" opens straight into scanning. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/shortcut_camera"
+        android:shortcutId="live_camera"
+        android:shortcutLongLabel="@string/shortcut_camera_long"
+        android:shortcutShortLabel="@string/shortcut_camera_short">
+        <intent
+            android:action="io.github.rotfarmer.converter.OPEN_CAMERA"
+            android:targetClass="io.github.rotfarmer.converter.MainActivity"
+            android:targetPackage="io.github.rotfarmer.converter" />
+    </shortcut>
+</shortcuts>
