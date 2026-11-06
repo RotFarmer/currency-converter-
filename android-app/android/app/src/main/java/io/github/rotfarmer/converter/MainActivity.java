@@ -7,8 +7,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // Lets the web app send the home-screen widget its data.
-        registerPlugin(ConverterWidgetPlugin.class);
+        // Lets the web app send the home-screen widgets their data.
+        registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

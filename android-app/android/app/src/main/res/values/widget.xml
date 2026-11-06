@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="widget_radius">18dp</dimen>
-    <string name="widget_name">Converter</string>
-    <string name="widget_title">CONVERTER</string>
-    <string name="widget_description">Your currencies converted to your home currency</string>
+    <string name="reference_name">Quick reference</string>
+    <string name="reference_description">Prices in the currency of the country you\'re in, shown in your home currency</string>
+    <string name="reference_title">QUICK REFERENCE</string>
+    <string name="reference_no_amounts">No amounts for this currency. Add some with Edit on Quick reference in Converter.</string>
+    <string name="converter_name">Converter</string>
+    <string name="converter_description">A keypad that converts the local currency to your home currency and back</string>
+    <string name="converter_title">CONVERTER</string>
     <string name="widget_setup">Open Converter once to set up the widget.</string>
-    <string name="widget_add_currencies">Choose a “Price in” currency or add some with ☰ in Converter.</string>
+    <string name="widget_setup_short">Open Converter once</string>
+    <string name="widget_no_currency">Choose a “Price in” currency in Converter, or add one with ☰.</string>
+    <string name="widget_no_currency_short">Choose “Price in” in Converter</string>
     <string name="widget_refresh">Refresh rates</string>
 </resources>

@@ -24,17 +24,43 @@
 
         </activity>
 
-        <!-- Home-screen widget -->
+        <!-- Home-screen widgets -->
         <receiver
-            android:name=".ConverterWidgetProvider"
+            android:name=".ConverterWidget"
             android:exported="false"
-            android:label="@string/widget_name">
+            android:label="@string/converter_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/converter_widget_info" />
+                android:resource="@xml/widget_converter_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ReferenceWidget"
+            android:exported="false"
+            android:label="@string/reference_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_reference_info" />
+        </receiver>
+
+        <!-- Taps on the widgets (keypad keys, refresh) -->
+        <receiver
+            android:name=".WidgetActions"
+            android:exported="false" />
+
+        <!-- Travelling: the widgets switch currency when the time zone changes (only the system sends this) -->
+        <receiver
+            android:name=".TimeZoneReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
         </receiver>
 
         <provider

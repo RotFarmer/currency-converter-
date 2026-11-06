@@ -10,6 +10,7 @@ import {
   regionName,
 } from './currencies.js';
 import { detectRegion } from './location.js';
+import { regionForTimeZone } from './timezones.js';
 import { ACCENT_PRESETS, SKINS, accentPalette, skinById, toCssText } from './theme.js';
 import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, parseAmountEntry, timeAgo, formatDateTime } from './format.js';
@@ -22,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v17'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v18'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -66,12 +67,15 @@ function saveSettings() {
   syncWidget();
 }
 
-/* ---------- Android app: home-screen widget ---------- */
-// Inside the Android app (Capacitor) the widget gets your currencies, an amount for each, the rates and
-// the theme's colours. It redraws itself from these and refreshes the rates on its own.
+/* ---------- Android app: home-screen widgets ---------- */
+// Inside the Android app (Capacitor) there are two widgets: a keypad converter and the quick reference table,
+// both for the currency of the country you're in. They get your currencies, quick reference amounts, the
+// rates, how each currency is written and the theme's colours, and redraw themselves from these. They also
+// refresh the rates on their own, and follow the phone's time zone to a new country when you travel.
 
 const isNativeApp = Boolean(window.Capacitor?.isNativePlatform?.());
 let widgetTimer = 0;
+let lastWidgetData = '';
 
 function syncWidget() {
   if (!isNativeApp) return;
@@ -97,35 +101,47 @@ function moneyParts(code) {
   return match ? { prefix: match[1], suffix: match[3] } : { prefix: '', suffix: ` ${code}` };
 }
 
-/** The amount from the quick reference list that's worth about 10 in the home currency. */
-function widgetAmount(code) {
-  const amounts = referenceAmounts(code).length ? referenceAmounts(code) : suggestedAmounts(code);
-  let best = amounts[Math.min(3, amounts.length - 1)];
-  let bestScore = Infinity;
-  for (const amount of amounts) {
-    const value = convert(amount, code, settings.home);
-    if (!(value > 0)) continue;
-    const score = Math.abs(Math.log10(value / 10));
-    if (score < bestScore) [best, bestScore] = [amount, score];
+/** Time zone → country and country → currency, so the widgets can tell where you are after travelling. */
+let zoneTables = null;
+function getZoneTables() {
+  if (zoneTables) return zoneTables;
+  const tzRegions = {};
+  const regionCurrencies = {};
+  for (const zone of Intl.supportedValuesOf?.('timeZone') || []) {
+    const region = regionForTimeZone(zone);
+    const code = region && currencyForRegion(region);
+    if (!code) continue;
+    tzRegions[zone] = region;
+    regionCurrencies[region] = code;
   }
-  return best;
+  zoneTables = { tzRegions, regionCurrencies };
+  return zoneTables;
 }
 
 function sendWidgetData() {
   const rates = getRates();
   const { home } = settings;
-  const codes = referenceTargets().slice(0, 6);
   const css = getComputedStyle(document.documentElement);
   const color = (name, fallback) => hexColor(css.getPropertyValue(name).trim(), fallback);
-  const homeParts = moneyParts(home);
+  const money = {};
+  for (const { code } of CURRENCIES) {
+    if (rates && !rates.rates[code]) continue;
+    const { prefix, suffix } = moneyParts(code);
+    money[code] = [prefix, suffix, fractionDigits(code)];
+  }
   const data = {
     home,
-    homePrefix: homeParts.prefix,
-    homeSuffix: homeParts.suffix,
-    homeDecimals: fractionDigits(home),
-    rows: rates ? codes.map((code) => ({ code, amount: widgetAmount(code), decimals: fractionDigits(code), ...moneyParts(code) })) : [],
-    rates: rates ? Object.fromEntries([home, ...codes].filter((code) => rates.rates[code]).map((code) => [code, rates.rates[code]])) : {},
+    source: settings.source,
+    autoSource: settings.autoSource,
+    sourceRegion: settings.autoSource ? settings.sourceRegion : null,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    extra: settings.extra,
+    refAmounts: settings.refAmounts || {},
+    money,
+    rates: rates ? rates.rates : {},
     ratesUpdatedAt: rates?.updatedAt || 0,
+    ratesFetchedAt: rates?.fetchedAt || 0,
+    ...(settings.autoSource ? getZoneTables() : {}),
     colors: {
       bg: color('--panel', '#040605'),
       text: color('--text', '#cfe3d3'),
@@ -134,7 +150,12 @@ function sendWidgetData() {
       line: color('--line-strong', '#2a5636'),
     },
   };
-  window.Capacitor.nativePromise('ConverterWidget', 'update', data).catch(() => {});
+  const json = JSON.stringify(data);
+  if (json === lastWidgetData) return;
+  lastWidgetData = json;
+  window.Capacitor.nativePromise('Widgets', 'update', data).catch(() => {
+    lastWidgetData = '';
+  });
 }
 
 function rememberRecent(code) {
