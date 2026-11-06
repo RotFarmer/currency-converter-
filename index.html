@@ -31,6 +31,7 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><path d="M5 5h10v10H5zM15 15l5 5"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v4h16v-4"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H4v11h16V10h-3"/></symbol>
     <symbol id="i-add" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 8v8M8 12h8"/></symbol>
@@ -81,9 +82,18 @@
           </div>
 
           <div class="divider-row">
-            <button type="button" class="menu-btn" id="extra-menu" aria-label="Choose up to 10 other currencies">
+            <button type="button" class="menu-btn" id="extra-menu" aria-expanded="false" aria-controls="extra">
               <svg aria-hidden="true"><use href="#i-menu"/></svg><span>Other currencies</span>
-              <span class="count" id="extra-count">0/10</span>
+              <span class="count" id="extra-count">0</span>
+              <svg class="menu-chevron" aria-hidden="true"><use href="#i-down"/></svg>
+            </button>
+          </div>
+
+          <div class="extra" id="extra" hidden>
+            <div class="extra-head"><span id="extra-basis"></span><span id="extra-limit">0/10</span></div>
+            <div id="extra-list"></div>
+            <button type="button" class="add-btn" id="extra-add">
+              <svg aria-hidden="true"><use href="#i-plus"/></svg> Add currency
             </button>
           </div>
 
@@ -102,10 +112,6 @@
             <div class="field-sub" data-name="home"></div>
           </div>
 
-          <div class="extra" id="extra" hidden>
-            <div class="extra-head"><span>Also in</span><span id="extra-basis"></span></div>
-            <div id="extra-list"></div>
-          </div>
         </div>
 
         <div class="panel">
