@@ -21,7 +21,7 @@ export const SKINS = [
   { id: 'cottage', name: 'Cottage' },
   { id: 'forest', name: 'Forest' },
   { id: 'ocean', name: 'Ocean' },
-  { id: 'frostmire', name: 'Frostmire' },
+  { id: 'ironbeetle', name: 'Iron Beetle' },
   { id: 'cloud', name: 'Cloud' },
   { id: 'aero', name: 'Aero' },
   { id: 'retro95', name: '90s', mode: 'light' },
@@ -30,8 +30,12 @@ export const SKINS = [
   { id: 'notebook', name: 'Notebook' },
 ];
 
+// Themes that were renamed.
+const RENAMED = { frostmire: 'ironbeetle' };
+
 export function skinById(id) {
-  return SKINS.find((skin) => skin.id === id) || SKINS[0];
+  const current = RENAMED[id] || id;
+  return SKINS.find((skin) => skin.id === current) || SKINS[0];
 }
 
 export function hexToHsl(hex) {

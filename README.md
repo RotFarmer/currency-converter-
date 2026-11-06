@@ -1,6 +1,6 @@
 # Currency Converter
 
-A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with thirteen whole-app themes, from the default mech-HUD look to an animated aurora, medieval parchment, a snowy medieval pine swamp, an autumn forest, the ocean and Windows 95. On Android it is also a real app with three home-screen widgets: a keypad converter, a quick reference table and a one-tap live camera.
+A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with thirteen whole-app themes, from the default mech-HUD look to an animated aurora, medieval parchment, the Iron Beetle swamp, an autumn forest, the ocean and Windows 95. On Android it is also a real app with three home-screen widgets: a keypad converter, a quick reference table and a one-tap live camera.
 
 - **Themes.** Settings → Appearance → Theme changes the fonts, colours and the shape of every panel, button and switch:
   - **HUD** (default): phosphor green mech HUD. Pick an accent colour (presets or any colour), turn scanlines, grid and glow on or off, and choose the HUD or a clean font.
@@ -9,7 +9,7 @@ A currency converter for your phone. Set a default currency once, and every pric
   - **Cottage**: gingham and lace, soft serif with handwritten labels, sage and dusty rose. Evening fireflies in dark mode.
   - **Forest**: autumn woods with leaves drifting down the screen, a wooden trail-sign title, a tree line and a wood tab bar. Moonlit forest by a campfire in dark mode.
   - **Ocean**: tropical shallows with rippling light, rising bubbles, a coral reef floor and a wavy water-surface tab bar. The deep sea with glowing bioluminescent accents in dark mode.
-  - **Frostmire**: a medieval snowy pine swamp. Black ornate blackletter on frosted parchment, snow falling in two layers, icicles under the header, snow lying on every panel, stag beetle and toadstool ornaments, a fly-agaric badge, and a frozen-water tab bar. Scroll to the end of a screen to see the swamp: snow-laden pines, a log of toadstools, a stag beetle, reeds and ice on the water. The mire by moonlight, with silver-grey text, in dark mode.
+  - **Iron Beetle**: a medieval pine swamp in the snow, big, green and alive. Large black blackletter (with a green iron sheen sweeping over the title) on moss-tinted parchment in iron frames, snow on every panel and moss with a glowing mushroom at its corner. Iron stag beetles with an emerald sheen walk across the screen and along the tab bar, a giant one breathes behind everything, will-o'-the-wisps drift up through a tall snowy pine forest, meltwater drips from the icicles, snow falls in two layers, heading icons wriggle and panels rise into place. Scroll to the end of a screen for the swamp: a log of fly agarics and glowing green mushrooms, reeds, moss and ice on green water. At night it glows.
   - **Cloud**: pastel sky with fluffy clouds, bubbly letters, pink-to-lavender buttons, a floating tab bar. Night clouds in dark mode.
   - **Aero**: Frutiger Aero glass panels, sky and bubbles, glossy aqua buttons.
   - **90s**: Windows 95 grey bevels, blue title bars with ✕, checkboxes, a teal desktop. Light only.

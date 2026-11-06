@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v22'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v23'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -59,6 +59,7 @@ const settings = {
   fx: { scanlines: true, grid: true, glow: true },
   ...load('settings', {}),
 };
+if (settings.skin === 'frostmire') settings.skin = 'ironbeetle'; // renamed theme
 settings.home ||= guessHomeCurrency();
 settings.source ||= settings.home === 'EUR' ? 'USD' : 'EUR';
 
