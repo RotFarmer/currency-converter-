@@ -26,6 +26,9 @@
 @font-face { font-family: "Pacifico"; src: url("../fonts/skins/pacifico-400.woff2") format("woff2"); font-display: swap; }
 @font-face { font-family: "Quicksand"; src: url("../fonts/skins/quicksand-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 @font-face { font-family: "Quicksand"; src: url("../fonts/skins/quicksand-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Outfit"; src: url("../fonts/skins/outfit-300.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "Outfit"; src: url("../fonts/skins/outfit-500.woff2") format("woff2"); font-weight: 400 500; font-display: swap; }
+@font-face { font-family: "Cormorant Garamond"; src: url("../fonts/skins/cormorant-garamond-600-italic.woff2") format("woff2"); font-weight: 600; font-style: italic; font-display: swap; }
 
 /* =====================================================================
    Shared base for every non-HUD skin: soft panels instead of angular HUD frames.
@@ -1527,6 +1530,411 @@
   :root[data-skin] body::before { animation: none; }
 }
 
+/* =====================================================================
+   AURORA — northern lights drifting behind glass, twinkling stars, a shooting star now and then,
+   shimmering gradient buttons and springy taps. Light: a pastel dawn sky with sparkles.
+   ===================================================================== */
+@property --aurora-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root[data-skin="aurora"] {
+  color-scheme: dark;
+  --bg: #060a1c;
+  --page-bg: radial-gradient(ellipse at 50% 115%, rgba(70, 45, 150, 0.55), transparent 60%), linear-gradient(180deg, #050816 0%, #0a1030 55%, #120c2e 100%);
+  --panel: #121a3a;
+  --panel-2: rgba(255, 255, 255, 0.06);
+  --panel-fill: rgba(16, 22, 52, 0.6);
+  --sheet-fill: rgba(16, 22, 52, 0.94);
+  --line: rgba(170, 190, 255, 0.16);
+  --line-strong: rgba(170, 190, 255, 0.34);
+  --accent: #7cf5d4;
+  --accent-dim: #4bb3a3;
+  --accent-soft: rgba(124, 245, 212, 0.12);
+  --glow: rgba(124, 245, 212, 0.5);
+  --on-accent: #071022;
+  --text: #eef1ff;
+  --text-dim: #b4bce6;
+  --text-faint: #7d87bb;
+  --warn: #ffd38a;
+  --danger: #ff8fa8;
+  --a1: #7cf5d4;
+  --a2: #6fc3ff;
+  --a3: #b18cff;
+  --a4: #ff8fd8;
+  --a5: #ffd38a;
+  --aurora-grad: linear-gradient(110deg, var(--a1), var(--a2), var(--a3), var(--a4), var(--a1));
+  --title-grad: linear-gradient(90deg, var(--a1), var(--a2), var(--a3), var(--a4), var(--a1));
+  --blob1: rgba(60, 242, 176, 0.5);
+  --blob2: rgba(52, 211, 240, 0.42);
+  --blob3: rgba(167, 123, 255, 0.48);
+  --blob4: rgba(255, 122, 217, 0.32);
+  --stars-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='136.1' cy='167.5' r='1' fill='%23ffffff'/%3E%3Ccircle cx='135.9' cy='253.7' r='0.8' fill='%23dff6ff'/%3E%3Ccircle cx='57.9' cy='153.5' r='1.6' fill='%23fff3d6'/%3E%3Ccircle cx='183.3' cy='58.4' r='1' fill='%23ffffff'/%3E%3Ccircle cx='92.6' cy='30.5' r='1.6' fill='%23dff6ff'/%3E%3Ccircle cx='189.3' cy='177.9' r='1' fill='%23fff3d6'/%3E%3Ccircle cx='285.7' cy='194.9' r='1.3' fill='%23ffffff'/%3E%3Ccircle cx='193.8' cy='186.0' r='1.3' fill='%23dff6ff'/%3E%3Ccircle cx='22.4' cy='14.4' r='0.8' fill='%23fff3d6'/%3E%3Ccircle cx='179.1' cy='231.2' r='1' fill='%23ffffff'/%3E%3Ccircle cx='132.6' cy='250.0' r='1.3' fill='%23dff6ff'/%3E%3Ccircle cx='72.2' cy='89.9' r='0.6' fill='%23fff3d6'/%3E%3Ccircle cx='197.4' cy='137.5' r='1' fill='%23ffffff'/%3E%3Ccircle cx='122.8' cy='165.0' r='0.6' fill='%23dff6ff'/%3E%3Ccircle cx='210.7' cy='96.1' r='0.8' fill='%23fff3d6'/%3E%3Ccircle cx='153.8' cy='12.7' r='1.3' fill='%23ffffff'/%3E%3Ccircle cx='219.2' cy='124.1' r='7.0' fill='rgba(160,230,255,.18)'/%3E%3Cpath d='M219.23485046670584 119.10394927880766Q220.13 123.20 224.23485046670584 124.10394927880766Q220.13 125.00 219.23485046670584 129.10394927880765Q218.33 125.00 214.23485046670584 124.10394927880766Q218.33 123.20 219.23485046670584 119.10394927880766Z' fill='%23ffffff'/%3E%3Ccircle cx='120.5' cy='269.1' r='8.399999999999999' fill='rgba(160,230,255,.18)'/%3E%3Cpath d='M120.49351824354297 263.09101966315154Q121.57 268.01 126.49351824354297 269.09101966315154Q121.57 270.17 120.49351824354297 275.09101966315154Q119.41 270.17 114.49351824354297 269.09101966315154Q119.41 268.01 120.49351824354297 263.09101966315154Z' fill='%23dff6ff'/%3E%3Ccircle cx='20.1' cy='74.5' r='5.6' fill='rgba(160,230,255,.18)'/%3E%3Cpath d='M20.14168363444832 70.52652782969889Q20.86 73.81 24.14168363444832 74.52652782969889Q20.86 75.25 20.14168363444832 78.52652782969889Q19.42 75.25 16.14168363444832 74.52652782969889Q19.42 73.81 20.14168363444832 70.52652782969889Z' fill='%23fff3d6'/%3E%3C/svg%3E");
+  --stars-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='274.1' cy='281.0' r='0.6' fill='%23ffffff'/%3E%3Ccircle cx='9.0' cy='93.6' r='1' fill='%23e8dcff'/%3E%3Ccircle cx='158.8' cy='42.0' r='0.8' fill='%23d6fff3'/%3E%3Ccircle cx='82.1' cy='8.1' r='1.3' fill='%23ffffff'/%3E%3Ccircle cx='136.9' cy='11.2' r='0.6' fill='%23e8dcff'/%3E%3Ccircle cx='290.5' cy='149.5' r='0.6' fill='%23d6fff3'/%3E%3Ccircle cx='153.7' cy='218.4' r='1' fill='%23ffffff'/%3E%3Ccircle cx='229.1' cy='64.0' r='0.6' fill='%23e8dcff'/%3E%3Ccircle cx='176.0' cy='196.1' r='1.3' fill='%23d6fff3'/%3E%3Ccircle cx='67.1' cy='218.7' r='1.3' fill='%23ffffff'/%3E%3Ccircle cx='225.9' cy='111.7' r='1.3' fill='%23e8dcff'/%3E%3Ccircle cx='86.1' cy='288.6' r='1.3' fill='%23d6fff3'/%3E%3Ccircle cx='42.3' cy='143.3' r='8.399999999999999' fill='rgba(200,170,255,.18)'/%3E%3Cpath d='M42.29139232420655 137.25726990539022Q43.37 142.18 48.29139232420655 143.25726990539022Q43.37 144.34 42.29139232420655 149.25726990539022Q41.21 144.34 36.29139232420655 143.25726990539022Q41.21 142.18 42.29139232420655 137.25726990539022Z' fill='%23ffffff'/%3E%3Ccircle cx='145.6' cy='225.8' r='8.399999999999999' fill='rgba(200,170,255,.18)'/%3E%3Cpath d='M145.60188780396072 219.78756061447712Q146.68 224.71 151.60188780396072 225.78756061447712Q146.68 226.87 145.60188780396072 231.78756061447712Q144.52 226.87 139.60188780396072 225.78756061447712Q144.52 224.71 145.60188780396072 219.78756061447712Z' fill='%23e8dcff'/%3E%3C/svg%3E");
+  --comet: linear-gradient(90deg, #ffffff, rgba(160, 230, 255, 0.6) 30%, transparent);
+  --font-mono: "Outfit", "Nunito", system-ui, sans-serif;
+  --font-head: "Outfit", "Nunito", system-ui, sans-serif;
+  --font-title: "Cormorant Garamond", Georgia, serif;
+  --radius: 24px;
+  --radius-sm: 999px;
+  --sheet-radius: 30px 30px 0 0;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --panel-border: 0;
+  --panel-bg: var(--panel-fill);
+  --topbar-bg: rgba(6, 10, 28, 0.55);
+  --statusbar: #050816;
+  --btn-primary-bg: var(--aurora-grad);
+  --btn-primary-text: #0b1030;
+  --secondary-fill: rgba(255, 255, 255, 0.06);
+  --menu-open-fill: rgba(124, 245, 212, 0.12);
+  --tag-bg: rgba(10, 14, 36, 0.88);
+  --tag-text: #eef1ff;
+  --tag-shadow: rgba(124, 245, 212, 0.4);
+  --tabbar-bg: rgba(8, 12, 32, 0.72);
+  --toast-bg: rgba(20, 26, 62, 0.96);
+  --toast-text: #eef1ff;
+  --scrim: rgba(4, 6, 20, 0.6);
+  --title-color: #eef1ff;
+}
+:root[data-skin="aurora"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #fbf3f8;
+  --page-bg: linear-gradient(180deg, #fff6fb 0%, #f6efff 50%, #eef6ff 100%);
+  --panel: #ffffff;
+  --panel-2: rgba(255, 255, 255, 0.65);
+  --panel-fill: rgba(255, 255, 255, 0.62);
+  --sheet-fill: rgba(255, 255, 255, 0.95);
+  --line: rgba(120, 100, 180, 0.16);
+  --line-strong: rgba(120, 100, 180, 0.32);
+  --accent: #7a5cff;
+  --accent-dim: #b6a4ff;
+  --accent-soft: rgba(122, 92, 255, 0.1);
+  --glow: rgba(150, 110, 255, 0.35);
+  --on-accent: #ffffff;
+  --text: #2a2346;
+  --text-dim: #5d5680;
+  --text-faint: #958fb5;
+  --warn: #c27a00;
+  --danger: #e0477a;
+  --a1: #6fe0c6;
+  --a2: #8fb4ff;
+  --a3: #b69bff;
+  --a4: #ff9ad5;
+  --a5: #ffc48f;
+  --blob1: rgba(255, 168, 205, 0.55);
+  --blob2: rgba(190, 160, 255, 0.5);
+  --blob3: rgba(140, 215, 255, 0.45);
+  --blob4: rgba(255, 205, 150, 0.5);
+  --stars-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='7.6' cy='36.8' r='1' fill='%23b48cff'/%3E%3Ccircle cx='45.1' cy='16.6' r='0.6' fill='%23ff8fc8'/%3E%3Ccircle cx='160.3' cy='211.8' r='0.8' fill='%23f5b862'/%3E%3Ccircle cx='47.0' cy='220.3' r='1.6' fill='%23b48cff'/%3E%3Ccircle cx='21.7' cy='71.5' r='1.6' fill='%23ff8fc8'/%3E%3Ccircle cx='134.7' cy='124.5' r='1.3' fill='%23f5b862'/%3E%3Ccircle cx='31.2' cy='9.9' r='1' fill='%23b48cff'/%3E%3Ccircle cx='103.7' cy='64.1' r='1' fill='%23ff8fc8'/%3E%3Ccircle cx='110.5' cy='282.9' r='0.8' fill='%23f5b862'/%3E%3Ccircle cx='215.4' cy='125.6' r='1.6' fill='%23b48cff'/%3E%3Ccircle cx='163.8' cy='282.5' r='0.8' fill='%23ff8fc8'/%3E%3Ccircle cx='107.8' cy='63.5' r='1' fill='%23f5b862'/%3E%3Cpath d='M27.89612578145661 206.11190854102875Q28.80 210.21 32.89612578145661 211.11190854102875Q28.80 212.01 27.89612578145661 216.11190854102875Q27.00 212.01 22.89612578145661 211.11190854102875Q27.00 210.21 27.89612578145661 206.11190854102875Z' fill='%23b48cff'/%3E%3Cpath d='M189.29917864730388 71.7733522803527Q190.20 75.87 194.29917864730388 76.7733522803527Q190.20 77.67 189.29917864730388 81.7733522803527Q188.40 77.67 184.29917864730388 76.7733522803527Q188.40 75.87 189.29917864730388 71.7733522803527Z' fill='%23ff8fc8'/%3E%3Cpath d='M209.75274693625173 64.39108906662089Q210.83 69.31 215.75274693625173 70.39108906662089Q210.83 71.47 209.75274693625173 76.39108906662089Q208.67 71.47 203.75274693625173 70.39108906662089Q208.67 69.31 209.75274693625173 64.39108906662089Z' fill='%23f5b862'/%3E%3Cpath d='M232.89381829639999 140.3444936183653Q233.79 144.44 237.89381829639999 145.3444936183653Q233.79 146.24 232.89381829639999 150.3444936183653Q231.99 146.24 227.89381829639999 145.3444936183653Q231.99 144.44 232.89381829639999 140.3444936183653Z' fill='%23b48cff'/%3E%3C/svg%3E");
+  --stars-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='106.7' cy='129.6' r='1' fill='%238fb4ff'/%3E%3Ccircle cx='170.7' cy='79.2' r='1' fill='%23c79bff'/%3E%3Ccircle cx='118.6' cy='15.9' r='1' fill='%23ff9fd0'/%3E%3Ccircle cx='196.3' cy='283.6' r='0.6' fill='%238fb4ff'/%3E%3Ccircle cx='81.0' cy='285.9' r='1' fill='%23c79bff'/%3E%3Ccircle cx='215.4' cy='6.7' r='1' fill='%23ff9fd0'/%3E%3Ccircle cx='169.7' cy='71.2' r='1.3' fill='%238fb4ff'/%3E%3Ccircle cx='154.1' cy='133.1' r='0.8' fill='%23c79bff'/%3E%3Ccircle cx='13.7' cy='113.3' r='1.6' fill='%23ff9fd0'/%3E%3Ccircle cx='107.2' cy='103.8' r='1.3' fill='%238fb4ff'/%3E%3Cpath d='M218.09356265482052 76.04098988353019Q219.17 80.96 224.09356265482052 82.04098988353019Q219.17 83.12 218.09356265482052 88.04098988353019Q217.01 83.12 212.09356265482052 82.04098988353019Q217.01 80.96 218.09356265482052 76.04098988353019Z' fill='%238fb4ff'/%3E%3Cpath d='M257.8879989924934 24.172520433588996Q258.79 28.27 262.8879989924934 29.172520433588996Q258.79 30.07 257.8879989924934 34.172520433589Q256.99 30.07 252.8879989924934 29.172520433588996Q256.99 28.27 257.8879989924934 24.172520433588996Z' fill='%23c79bff'/%3E%3Cpath d='M45.46623851610752 164.37153348125858Q46.55 169.29 51.46623851610752 170.37153348125858Q46.55 171.45 45.46623851610752 176.37153348125858Q44.39 171.45 39.46623851610752 170.37153348125858Q44.39 169.29 45.46623851610752 164.37153348125858Z' fill='%23ff9fd0'/%3E%3C/svg%3E");
+  --comet: linear-gradient(90deg, #ffffff, rgba(255, 170, 220, 0.7) 30%, transparent);
+  --title-grad: linear-gradient(90deg, #6a4cf0, #d9479a, #2c93c9, #8a4ff0, #6a4cf0);
+  --shadow: 0 16px 36px rgba(110, 80, 170, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --topbar-bg: rgba(255, 246, 251, 0.6);
+  --statusbar: #2a2346;
+  --btn-primary-text: #24193f;
+  --secondary-fill: rgba(255, 255, 255, 0.6);
+  --menu-open-fill: rgba(122, 92, 255, 0.1);
+  --tag-bg: rgba(255, 255, 255, 0.94);
+  --tag-text: #2a2346;
+  --tag-shadow: rgba(150, 110, 255, 0.35);
+  --tabbar-bg: rgba(255, 250, 253, 0.75);
+  --toast-bg: rgba(255, 255, 255, 0.97);
+  --toast-text: #2a2346;
+  --scrim: rgba(60, 40, 100, 0.3);
+  --title-color: #2a2346;
+}
+
+/* --- the sky: two layers of aurora drifting at different speeds, two layers of stars twinkling --- */
+:root[data-skin="aurora"] body::before,
+:root[data-skin="aurora"] .app::before {
+  content: "";
+  position: fixed;
+  z-index: -3;
+  pointer-events: none;
+}
+:root[data-skin="aurora"] body::before {
+  inset: -25% -45%;
+  background:
+    radial-gradient(38% 20% at 30% 28%, var(--blob1), transparent 70%),
+    radial-gradient(34% 24% at 72% 24%, var(--blob2), transparent 70%),
+    radial-gradient(44% 26% at 52% 62%, var(--blob3), transparent 72%);
+  animation: aurora-drift-a 22s ease-in-out infinite alternate;
+}
+:root[data-skin="aurora"] .app::before {
+  inset: -30% -45%;
+  background:
+    radial-gradient(30% 16% at 38% 44%, var(--blob4), transparent 70%),
+    radial-gradient(40% 15% at 64% 74%, var(--blob1), transparent 72%),
+    radial-gradient(26% 20% at 22% 82%, var(--blob2), transparent 70%);
+  animation: aurora-drift-b 31s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift-a {
+  0% { transform: translate3d(-6%, -3%, 0) rotate(-9deg) scale(1); }
+  50% { transform: translate3d(5%, 4%, 0) rotate(7deg) scale(1.14); }
+  100% { transform: translate3d(-2%, 9%, 0) rotate(-3deg) scale(0.94); }
+}
+@keyframes aurora-drift-b {
+  0% { transform: translate3d(7%, 5%, 0) rotate(12deg) scale(1.08); }
+  50% { transform: translate3d(-6%, -4%, 0) rotate(-6deg) scale(0.92); }
+  100% { transform: translate3d(3%, -9%, 0) rotate(4deg) scale(1.16); }
+}
+:root[data-skin="aurora"] body::after,
+:root[data-skin="aurora"] .app::after {
+  content: "";
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  pointer-events: none;
+}
+:root[data-skin="aurora"] body::after {
+  background: var(--stars-a) 0 0 / 300px 300px repeat;
+  animation: aurora-twinkle 3.6s ease-in-out infinite alternate;
+}
+:root[data-skin="aurora"] .app::after {
+  inset: -300px 0 0;
+  background: var(--stars-b) 150px 120px / 300px 300px repeat;
+  animation: aurora-twinkle 4.4s ease-in-out -2.2s infinite alternate, aurora-float 90s linear infinite;
+}
+@keyframes aurora-twinkle {
+  from { opacity: 0.25; }
+  to { opacity: 1; }
+}
+@keyframes aurora-float {
+  to { transform: translate3d(0, 300px, 0); }
+}
+/* a shooting star every 11 seconds */
+:root[data-skin="aurora"]::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  top: 14vh;
+  left: 82vw;
+  width: 150px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--comet);
+  transform-origin: 0 50%;
+  opacity: 0;
+  animation: aurora-shoot 11s ease-in 3s infinite;
+  pointer-events: none;
+}
+@keyframes aurora-shoot {
+  0% { transform: translate3d(0, 0, 0) rotate(-36deg); opacity: 0; }
+  1% { opacity: 1; }
+  9% { transform: translate3d(-330px, 240px, 0) rotate(-36deg); opacity: 0; }
+  100% { transform: translate3d(-330px, 240px, 0) rotate(-36deg); opacity: 0; }
+}
+
+/* --- glass panels with a slowly turning rainbow edge; they float in when a screen opens --- */
+:root[data-skin="aurora"] .panel {
+  background: var(--panel-fill);
+  border: 0;
+  box-shadow: var(--shadow);
+}
+:root[data-skin="aurora"] .panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--aurora-angle), var(--a1), var(--a2), var(--a3), var(--a4), var(--a5), var(--a1));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0.75;
+  animation: aurora-spin 9s linear infinite;
+  pointer-events: none;
+}
+@keyframes aurora-spin {
+  to { --aurora-angle: 360deg; }
+}
+:root[data-skin="aurora"] .view:not([hidden]) > *,
+:root[data-skin="aurora"] .stack:not([hidden]) > * {
+  animation: aurora-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+:root[data-skin="aurora"] :is(.view, .stack) > :nth-child(2) { animation-delay: 0.07s; }
+:root[data-skin="aurora"] :is(.view, .stack) > :nth-child(3) { animation-delay: 0.14s; }
+:root[data-skin="aurora"] :is(.view, .stack) > :nth-child(4) { animation-delay: 0.21s; }
+:root[data-skin="aurora"] :is(.view, .stack) > :nth-child(5) { animation-delay: 0.28s; }
+:root[data-skin="aurora"] :is(.view, .stack) > :nth-child(n + 6) { animation-delay: 0.35s; }
+@keyframes aurora-rise {
+  from { opacity: 0; transform: translate3d(0, 22px, 0) scale(0.97); }
+}
+
+/* --- headings: an elegant italic serif in flowing aurora colours, with twinkling sparkles --- */
+:root[data-skin="aurora"] .topbar { border-bottom-color: var(--line); }
+:root[data-skin="aurora"] .topbar h1,
+:root[data-skin="aurora"] .sheet-header h2 {
+  font-style: italic;
+  font-weight: 600;
+  background: var(--title-grad) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: aurora-flow 7s linear infinite;
+}
+:root[data-skin="aurora"] .topbar h1 { font-size: 32px; line-height: 1.15; padding-right: 6px; }
+:root[data-skin="aurora"] .sheet-header h2 { font-size: 26px; line-height: 1.2; padding-right: 4px; }
+@keyframes aurora-flow {
+  to { background-position: 200% 0; }
+}
+:root[data-skin="aurora"] .sys-code {
+  border-radius: 999px;
+  background: var(--aurora-grad) 0 0 / 200% 100%;
+  color: var(--btn-primary-text);
+  font-weight: 500;
+  animation: aurora-flow 7s linear infinite;
+}
+:root[data-skin="aurora"] .panel-head {
+  font: italic 600 21px/1.2 var(--font-title);
+  color: var(--text);
+  border-bottom-color: var(--line);
+}
+:root[data-skin="aurora"] .panel-head > span:first-child::before {
+  content: "✦";
+  display: inline-block;
+  width: auto;
+  height: auto;
+  background: none;
+  color: var(--a1);
+  font: normal 13px var(--font-mono);
+  animation: aurora-sparkle 2.8s ease-in-out infinite;
+}
+:root[data-skin="aurora"][data-mode="light"] .panel-head > span:first-child::before { color: var(--a3); }
+@keyframes aurora-sparkle {
+  0%, 100% { transform: scale(0.75) rotate(0deg); opacity: 0.55; }
+  50% { transform: scale(1.2) rotate(90deg); opacity: 1; }
+}
+:root[data-skin="aurora"] .panel-head > span + span { font: 300 13px var(--font-mono); }
+:root[data-skin="aurora"] .head-btn { font: 500 13px var(--font-mono); }
+:root[data-skin="aurora"] :is(.field-label, .setting-label) { font-size: 11px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-faint); }
+
+/* --- numbers: light, large and softly glowing --- */
+:root[data-skin="aurora"] .amount-input { font-size: 46px; font-weight: 300; color: var(--text); text-shadow: 0 0 22px var(--glow); caret-color: var(--accent); }
+:root[data-skin="aurora"] .extra-input { font-weight: 300; font-size: 22px; color: var(--text); text-shadow: 0 0 14px var(--glow); }
+:root[data-skin="aurora"] .ref-row { font-weight: 300; }
+:root[data-skin="aurora"] .ref-row span:last-child { font-weight: 500; }
+:root[data-skin="aurora"] .ref-row:active { background: linear-gradient(90deg, transparent, var(--accent-soft), transparent); }
+
+/* --- buttons: flowing gradient with a shimmer passing over; everything springs when tapped --- */
+:root[data-skin="aurora"] :is(.btn-primary, .install-top) {
+  position: relative;
+  overflow: hidden;
+  background: var(--aurora-grad) 0 0 / 200% 100%;
+  color: var(--btn-primary-text);
+  font-weight: 500;
+  box-shadow: 0 8px 24px var(--glow);
+  animation: aurora-flow 6s linear infinite;
+}
+:root[data-skin="aurora"] :is(.btn-primary, .install-top)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.6) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: aurora-shimmer 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes aurora-shimmer {
+  0%, 55% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(120%); }
+}
+:root[data-skin="aurora"] .btn-secondary { color: var(--accent); background: var(--secondary-fill); box-shadow: inset 0 0 0 1px var(--line-strong); }
+:root[data-skin="aurora"] :is(.btn, .install-top, .currency-chip, .menu-btn, .ref-tab, .ref-chip, .add-btn, .clear-btn, .row-remove, .icon-btn, .skin-card, .swatch, .segmented button, .tabbar button, .list-row) {
+  transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1), background-color 0.2s ease, box-shadow 0.2s ease;
+}
+:root[data-skin="aurora"] :is(.btn, .install-top, .currency-chip, .menu-btn, .ref-tab, .ref-chip, .add-btn, .skin-card, .swatch):active { transform: scale(0.95); }
+:root[data-skin="aurora"] :is(.clear-btn, .row-remove, .icon-btn):active { transform: scale(0.85) rotate(-8deg); }
+:root[data-skin="aurora"] :is(.currency-chip, .menu-btn) { background: var(--secondary-fill); box-shadow: inset 0 0 0 1px var(--line-strong); font-weight: 500; }
+:root[data-skin="aurora"] .menu-btn[aria-expanded="true"] { box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 18px var(--accent-soft); }
+:root[data-skin="aurora"] .sym {
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.55), transparent 55%), var(--aurora-grad);
+  color: var(--btn-primary-text);
+  font-weight: 500;
+  box-shadow: 0 0 12px var(--accent-soft);
+}
+:root[data-skin="aurora"] .segmented { border-color: var(--line-strong); }
+:root[data-skin="aurora"] .segmented button[aria-pressed="true"] { background: var(--aurora-grad) 0 0 / 200% 100%; color: var(--btn-primary-text); animation: aurora-flow 6s linear infinite; }
+:root[data-skin="aurora"] .ref-tab[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 0 14px var(--accent-soft); }
+:root[data-skin="aurora"] .extra { background: var(--panel-2); border-color: var(--line); animation: aurora-unfold 0.45s cubic-bezier(0.2, 1, 0.3, 1); }
+@keyframes aurora-unfold {
+  from { opacity: 0; transform: translate3d(0, -10px, 0) scale(0.98); }
+}
+
+/* --- switches spring across; the track lights up --- */
+:root[data-skin="aurora"] .switch { background: var(--line-strong); }
+:root[data-skin="aurora"] .switch::after { transition: transform 0.45s cubic-bezier(0.3, 1.7, 0.5, 1), background-color 0.2s ease; }
+:root[data-skin="aurora"] .switch:checked { background: var(--aurora-grad) 0 0 / 200% 100%; box-shadow: 0 0 14px var(--glow); animation: aurora-flow 6s linear infinite; }
+
+/* --- tab bar: frosted, with a glowing ribbon and a little bounce on the open tab --- */
+:root[data-skin="aurora"] .tabbar { border-top-color: var(--line); }
+:root[data-skin="aurora"] .tabbar button[aria-current="page"] { color: var(--accent); }
+:root[data-skin="aurora"] .tabbar button[aria-current="page"] svg { filter: drop-shadow(0 0 6px var(--glow)); animation: aurora-bounce 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+:root[data-skin="aurora"] .tabbar button[aria-current="page"]::before {
+  top: -1px;
+  left: 30%;
+  right: 30%;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--aurora-grad) 0 0 / 200% 100%;
+  box-shadow: 0 0 12px var(--glow);
+  animation: aurora-flow 4s linear infinite, aurora-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes aurora-bounce {
+  0% { transform: none; }
+  40% { transform: translate3d(0, -6px, 0) scale(1.14); }
+  100% { transform: none; }
+}
+@keyframes aurora-pop {
+  from { transform: scaleX(0); opacity: 0; }
+}
+
+/* --- sheets glide up with a spring; toasts pop --- */
+:root[data-skin="aurora"] .sheet {
+  background: var(--sheet-fill);
+  border-top: 1px solid var(--line-strong);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  animation: aurora-sheet 0.55s cubic-bezier(0.2, 1.15, 0.3, 1) both;
+}
+:root[data-skin="aurora"] .sheet-bottom .sheet-actions { background: transparent; }
+@keyframes aurora-sheet {
+  from { transform: translate3d(0, 100%, 0); }
+}
+:root[data-skin="aurora"] .toast { border-color: var(--line-strong); box-shadow: 0 10px 30px var(--glow); animation: aurora-toast 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes aurora-toast {
+  from { opacity: 0; transform: translate(-50%, 14px) scale(0.88); }
+}
+:root[data-skin="aurora"] .picker-row[aria-selected="true"] { background: var(--accent-soft); }
+:root[data-skin="aurora"] .ref-chip { background: var(--secondary-fill); border-color: var(--line-strong); }
+
+/* --- photos: a glowing frame; converted prices fade in --- */
+:root[data-skin="aurora"] .photo-wrap { border: 1.5px solid var(--line-strong); box-shadow: 0 0 30px var(--accent-soft); }
+:root[data-skin="aurora"] .price-tag { border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; font-weight: 500; box-shadow: 0 0 14px var(--tag-shadow); animation: aurora-fade 0.6s ease both; }
+@keyframes aurora-fade {
+  from { opacity: 0; }
+}
+:root[data-skin="aurora"] .rates-pill { background: var(--secondary-fill); border-color: var(--line-strong); }
+
+/* Everything holds still for people who turn animations off */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin="aurora"],
+  :root[data-skin="aurora"]::before,
+  :root[data-skin="aurora"] *,
+  :root[data-skin="aurora"] *::before,
+  :root[data-skin="aurora"] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  :root[data-skin="aurora"]::before { opacity: 0; }
+}
+
 /* Pixel fonts and handwriting look small at the HUD's small-print sizes */
 :root:is([data-skin="vapor"], [data-skin="pixel"], [data-skin="notebook"]) :is(.extra-head, .extra-row .name, .field-sub, .row-hint, .price-row .sub,
   .translation-row .orig, .footnote, .lang-status, .lang-google, .install-note, .setting-note, .readout .note, .camera-status, .ref-chip .home) {
@@ -1623,3 +2031,33 @@
 .skin-card[data-skin-option="ocean"] .sp-title { font: 16px "Pacifico", cursive; line-height: 1.3; color: #04506b; }
 .skin-card[data-skin-option="ocean"] .sp-num { font: 700 15px "Quicksand", sans-serif; color: #04506b; }
 .skin-card[data-skin-option="ocean"] .sp-btn { align-self: flex-start; border-radius: 999px; background: linear-gradient(180deg, #2bb8dc, #066b91); }
+
+.skin-card[data-skin-option="aurora"] .skin-preview {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='136.1' cy='167.5' r='1' fill='%23ffffff'/%3E%3Ccircle cx='135.9' cy='253.7' r='0.8' fill='%23dff6ff'/%3E%3Ccircle cx='57.9' cy='153.5' r='1.6' fill='%23fff3d6'/%3E%3Ccircle cx='183.3' cy='58.4' r='1' fill='%23ffffff'/%3E%3Ccircle cx='92.6' cy='30.5' r='1.6' fill='%23dff6ff'/%3E%3Ccircle cx='189.3' cy='177.9' r='1' fill='%23fff3d6'/%3E%3Ccircle cx='285.7' cy='194.9' r='1.3' fill='%23ffffff'/%3E%3Ccircle cx='193.8' cy='186.0' r='1.3' fill='%23dff6ff'/%3E%3Ccircle cx='22.4' cy='14.4' r='0.8' fill='%23fff3d6'/%3E%3Ccircle cx='179.1' cy='231.2' r='1' fill='%23ffffff'/%3E%3Ccircle cx='132.6' cy='250.0' r='1.3' fill='%23dff6ff'/%3E%3Ccircle cx='72.2' cy='89.9' r='0.6' fill='%23fff3d6'/%3E%3Ccircle cx='197.4' cy='137.5' r='1' fill='%23ffffff'/%3E%3Ccircle cx='122.8' cy='165.0' r='0.6' fill='%23dff6ff'/%3E%3Ccircle cx='210.7' cy='96.1' r='0.8' fill='%23fff3d6'/%3E%3Ccircle cx='153.8' cy='12.7' r='1.3' fill='%23ffffff'/%3E%3Ccircle cx='219.2' cy='124.1' r='7.0' fill='rgba(160,230,255,.18)'/%3E%3Cpath d='M219.23485046670584 119.10394927880766Q220.13 123.20 224.23485046670584 124.10394927880766Q220.13 125.00 219.23485046670584 129.10394927880765Q218.33 125.00 214.23485046670584 124.10394927880766Q218.33 123.20 219.23485046670584 119.10394927880766Z' fill='%23ffffff'/%3E%3Ccircle cx='120.5' cy='269.1' r='8.399999999999999' fill='rgba(160,230,255,.18)'/%3E%3Cpath d='M120.49351824354297 263.09101966315154Q121.57 268.01 126.49351824354297 269.09101966315154Q121.57 270.17 120.49351824354297 275.09101966315154Q119.41 270.17 114.49351824354297 269.09101966315154Q119.41 268.01 120.49351824354297 263.09101966315154Z' fill='%23dff6ff'/%3E%3Ccircle cx='20.1' cy='74.5' r='5.6' fill='rgba(160,230,255,.18)'/%3E%3Cpath d='M20.14168363444832 70.52652782969889Q20.86 73.81 24.14168363444832 74.52652782969889Q20.86 75.25 20.14168363444832 78.52652782969889Q19.42 75.25 16.14168363444832 74.52652782969889Q19.42 73.81 20.14168363444832 70.52652782969889Z' fill='%23fff3d6'/%3E%3C/svg%3E") 0 0 / 120px 120px,
+    radial-gradient(60% 40% at 25% 35%, rgba(60, 242, 176, 0.6), transparent 70%),
+    radial-gradient(55% 45% at 80% 30%, rgba(167, 123, 255, 0.65), transparent 70%),
+    radial-gradient(60% 40% at 55% 85%, rgba(255, 122, 217, 0.45), transparent 70%),
+    linear-gradient(180deg, #070b22, #120c2e);
+  background-size: 120px 120px, 200% 200%, 200% 200%, 200% 200%, 100% 100%;
+  border: 1px solid rgba(170, 190, 255, 0.4);
+  color: #eef1ff;
+  border-radius: 18px;
+  animation: aurora-card 9s ease-in-out infinite alternate;
+}
+@keyframes aurora-card {
+  to { background-position: 0 0, 100% 50%, 0 100%, 100% 0, 0 0; }
+}
+.skin-card[data-skin-option="aurora"] .sp-title {
+  font: italic 600 19px "Cormorant Garamond", serif;
+  background: linear-gradient(90deg, #7cf5d4, #6fc3ff, #b18cff, #ff8fd8, #7cf5d4) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: aurora-flow 6s linear infinite;
+}
+.skin-card[data-skin-option="aurora"] .sp-num { font: 300 17px "Outfit", sans-serif; text-shadow: 0 0 10px rgba(124, 245, 212, 0.7); }
+.skin-card[data-skin-option="aurora"] .sp-btn { border-radius: 999px; background: linear-gradient(110deg, #7cf5d4, #6fc3ff, #b18cff, #ff8fd8, #7cf5d4) 0 0 / 200% 100%; animation: aurora-flow 6s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .skin-card[data-skin-option="aurora"] :is(.skin-preview, .sp-title, .sp-btn) { animation: none; }
+}

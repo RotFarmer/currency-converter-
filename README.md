@@ -1,9 +1,10 @@
 # Currency Converter
 
-A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with eleven whole-app themes, from the default mech-HUD look to medieval parchment, an autumn forest, the ocean and Windows 95.
+A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with twelve whole-app themes, from the default mech-HUD look to an animated aurora, medieval parchment, an autumn forest, the ocean and Windows 95. On Android it is also a real app with a home-screen widget.
 
 - **Themes.** Settings → Appearance → Theme changes the fonts, colours and the shape of every panel, button and switch:
   - **HUD** (default): phosphor green mech HUD. Pick an accent colour (presets or any colour), turn scanlines, grid and glow on or off, and choose the HUD or a clean font.
+  - **Aurora**: the prettiest and most animated. Northern lights drift behind glass panels with slowly turning rainbow edges, stars twinkle, a shooting star crosses now and then, headings and buttons shimmer in flowing aurora colours, and buttons, switches and sheets spring when you tap them. A pastel dawn sky with sparkles in light mode.
   - **Medieval**: parchment, blackletter title, gilded corners, wax-seal buttons. Candlelit at night.
   - **Cottage**: gingham and lace, soft serif with handwritten labels, sage and dusty rose. Evening fireflies in dark mode.
   - **Forest**: autumn woods with leaves drifting down the screen, a wooden trail-sign title, a tree line and a wood tab bar. Moonlit forest by a campfire in dark mode.
@@ -15,7 +16,7 @@ A currency converter for your phone. Set a default currency once, and every pric
   - **8-bit**: pixel fonts, chunky pixel borders, a starfield. Dark only.
   - **Notebook**: lined paper, handwriting, tape and highlighter. A chalkboard in dark mode.
 
-  System / Light / Dark applies to every theme that has both. **Reset to default look** goes back to the green HUD. The falling leaves and bubbles stay still if your phone's reduce-motion setting is on. The live camera view keeps the HUD look so the overlays stay readable on any photo.
+  System / Light / Dark applies to every theme that has both. **Reset to default look** goes back to the green HUD. The moving backgrounds (aurora, leaves, bubbles) stay still if your phone's reduce-motion setting is on. The live camera view keeps the HUD look so the overlays stay readable on any photo.
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
 - **Quick reference tabs.** Tables of amounts, always shown in your home currency: one tab for your "Price in" currency and one for each currency in the ☰ drawer. Swipe left/right or tap a tab to switch; tap a row to put that amount in the converter. Tap **Edit** to choose the amounts for the currency on screen: remove the ones you don't need, type your own, or add back suggested ones. Each currency keeps its own list, and **Reset** brings back the suggested amounts.
@@ -46,6 +47,20 @@ The live view reads prices with a sign (¥, €, $ …) about once a second. Pri
 Tips for scanning: get close enough that prices fill a good part of the photo, hold steady and use decent light. The first scan downloads the text reader (about 6 MB). A photo in a non-Latin script also downloads that script's model (1–3 MB) the first time.
 
 Settings → Language has switches for translation and for guessing the currency from the language, and lets you pick the language to translate into.
+
+## Android app and widget
+
+On Android you can install Converter as a real app, with a home-screen widget.
+
+1. On your phone, open **https://github.com/RotFarmer/currency-converter-/releases/download/android-latest/Converter.apk**. It downloads the newest version.
+2. Open the downloaded file. The first time, Android asks you to allow installing apps from your browser; allow it, then tap **Install**.
+3. To add the widget: long-press an empty spot on your home screen, tap **Widgets**, find **Converter** and drag it onto the screen. It shows each of your currencies ("Price in" and the ☰ drawer) with a typical amount converted to your home currency, in your theme's colours. Tap the time in its corner to refresh the rates; tap anywhere else to open the app. Make it taller to see more currencies.
+
+The app opens the same site as the web version, so updates to the app's features arrive by themselves. You only need to download the APK again when the app or widget itself changes. The widget refreshes rates every few hours on its own, even if you don't open the app.
+
+**Updates and the signing key.** Android only installs an update over the old app if both are signed with the same key. To give the app a permanent key, add a repository secret once: on GitHub, open the repository's **Settings → Secrets and variables → Actions → New repository secret**, name it `ANDROID_SIGNING_PASSWORD`, and give it a long password you make up. The next build creates the key, locked with that password, and saves it (encrypted) in `android-app/signing/`. Until then each build is signed with a temporary key, so to install a newer build you remove the old app first, which also clears its settings.
+
+How it's built: `android-app/` is a [Capacitor](https://capacitorjs.com) project. The widget is native Android code in `android-app/android/app/src/main/java/` (`ConverterWidgetProvider.java`); the web app sends it data through a small plugin (`ConverterWidgetPlugin.java`, called from `sendWidgetData` in `js/app.js`). The **Android app** GitHub Actions workflow (`.github/workflows/android.yml`) builds the APK whenever `android-app/` changes and publishes it as the `android-latest` release. You can also run it by hand from the repository's **Actions** tab.
 
 ## Translation
 
@@ -100,6 +115,8 @@ Project layout:
 | `js/timezones.js` | Time zone → country table (generated from the IANA time zone database) |
 | `js/format.js` | Number formatting and parsing |
 | `sw.js` | Service worker for offline use |
+| `android-app/` | The Android app (Capacitor) and its home-screen widget |
+| `.github/workflows/android.yml` | Builds and publishes the Android APK |
 | `fonts/` | Share Tech Mono and Chakra Petch; `fonts/skins/` holds the theme fonts, loaded only when a theme uses them (all SIL Open Font License) |
 | `tests/` | Unit tests (`node --test`) |
 

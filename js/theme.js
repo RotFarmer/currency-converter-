@@ -16,6 +16,7 @@ export const ACCENT_PRESETS = [
 // keeps its own copy of those, so update both together.
 export const SKINS = [
   { id: 'hud', name: 'HUD' },
+  { id: 'aurora', name: 'Aurora' },
   { id: 'medieval', name: 'Medieval' },
   { id: 'cottage', name: 'Cottage' },
   { id: 'forest', name: 'Forest' },
