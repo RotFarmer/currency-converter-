@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v20'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v21'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -664,6 +664,29 @@ function moveExtra(from, to) {
   saveExtra();
 }
 
+/**
+ * While a ☰ row is being dragged, the quick reference tabs move with it: the "Price in" tab stays first and the
+ * others take the order the drawer would have if you let go now, sliding into place.
+ */
+function previewTabs(from, to) {
+  const order = [...settings.extra];
+  const [moved] = order.splice(from, 1);
+  order.splice(to, 0, moved);
+  const tabs = [...refTabs.querySelectorAll('[data-ref-tab]')];
+  const before = new Map(tabs.map((tab) => [tab, tab.getBoundingClientRect().left]));
+  const byCode = new Map(tabs.map((tab) => [tab.dataset.refTab, tab]));
+  for (const code of order) {
+    if (code === settings.source || code === settings.home) continue;
+    const tab = byCode.get(code);
+    if (tab) refTabs.appendChild(tab);
+  }
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const tab of tabs) {
+    const dx = before.get(tab) - tab.getBoundingClientRect().left;
+    if (dx) tab.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  }
+}
+
 $('#extra-list').addEventListener('pointerdown', (event) => {
   const handle = event.target.closest('.row-handle');
   if (!handle || drag || settings.extra.length < 2) return;
@@ -690,6 +713,7 @@ function dragTo(clientY) {
   tops.forEach((top, i) => {
     if (i !== from && top + step / 2 < middle) to++;
   });
+  if (to !== drag.to) previewTabs(from, to);
   drag.to = to;
   rows.forEach((other, i) => {
     if (i === from) return;
@@ -727,7 +751,8 @@ function endDrag(event) {
   $('#extra-list').classList.remove('sorting');
   row.classList.remove('dragging');
   for (const r of rows) r.style.transform = '';
-  if (event.type === 'pointerup') moveExtra(from, to);
+  if (event.type === 'pointerup' && to !== from) moveExtra(from, to);
+  else renderReference();
 }
 $('#extra-list').addEventListener('pointerup', endDrag);
 $('#extra-list').addEventListener('pointercancel', endDrag);
@@ -738,7 +763,10 @@ $('#extra-list').addEventListener('keydown', (event) => {
   event.preventDefault();
   const code = handle.dataset.handle;
   const from = settings.extra.indexOf(code);
-  moveExtra(from, from + (event.key === 'ArrowUp' ? -1 : 1));
+  const to = from + (event.key === 'ArrowUp' ? -1 : 1);
+  if (to < 0 || to >= settings.extra.length) return;
+  previewTabs(from, to);
+  moveExtra(from, to);
   $(`.row-handle[data-handle="${code}"]`)?.focus();
 });
 
@@ -1991,6 +2019,85 @@ async function handleLaunchAction() {
 }
 window.addEventListener('converterlaunch', handleLaunchAction);
 handleLaunchAction();
+
+/* ---------- Android app: updates ---------- */
+// The app shell and widgets update through GitHub builds (everything else comes from the live site anyway).
+// The native side checks the newest build; here we show it in Settings, offer a banner when it's ready, and
+// start the install when you tap. You confirm the first update; later ones install by themselves (Android 12+).
+
+let appUpdate = null; // { installed, installedName, latest, latestName, sameKey, quiet, status, error }
+
+async function checkAppUpdate({ manual = false } = {}) {
+  if (!isNativeApp) return;
+  if (manual) renderAppUpdate('checking');
+  try {
+    appUpdate = await window.Capacitor.nativePromise('Widgets', 'checkUpdate', {});
+  } catch {
+    appUpdate = null; // an older app without the updater
+  }
+  renderAppUpdate();
+  if (manual && appUpdate && !appUpdate.error && !(appUpdate.latest > appUpdate.installed)) toast('The app is up to date');
+}
+
+function renderAppUpdate(state) {
+  const panel = $('#app-panel');
+  panel.hidden = !isNativeApp || !appUpdate;
+  if (panel.hidden) {
+    $('#update-card').hidden = true;
+    return;
+  }
+  const u = appUpdate;
+  const newer = u.latest > u.installed;
+  $('#app-version-name').textContent = u.installedName ? `Version ${u.installedName}` : '';
+  let title = 'Up to date';
+  let hint = u.quiet ? 'New versions install by themselves when you’re not using the app.' : 'Checks for new versions when it opens.';
+  let button = 'Check for updates';
+  if (state === 'checking') title = 'Checking…';
+  else if (u.error) [title, hint] = ['Couldn’t check for updates', 'Check your connection and try again.'];
+  else if (newer && !u.sameKey) {
+    title = `Version ${u.latestName} is available`;
+    hint = 'It’s signed with a different key, so it can’t update this copy: remove the app, then install it again from GitHub.';
+    button = 'Open the download page';
+  } else if (newer) {
+    title = `Version ${u.latestName} is ready`;
+    hint = u.quiet ? 'It installs by itself shortly after you leave the app, or install it now (the app restarts).' : 'Android asks you to confirm this update; later ones install by themselves.';
+    button = 'Install update';
+  }
+  if (u.status?.startsWith('failed')) hint = `The last update didn’t install (${u.status.slice(8)}). Try again.`;
+  $('#update-title').textContent = title;
+  $('#update-hint').textContent = hint;
+  $('#update-btn-label').textContent = button;
+  $('#update-btn').dataset.action = newer ? (u.sameKey ? 'install' : 'download') : 'check';
+  $('#update-btn-icon').setAttribute('href', newer ? '#i-download' : '#i-refresh');
+  // Banner on the Convert tab when an update can be installed.
+  $('#update-card').hidden = !(newer && u.sameKey && !u.error);
+  $('#update-card-text').textContent = `Version ${u.latestName} of the app is ready.`;
+}
+
+async function installAppUpdate() {
+  try {
+    const result = await window.Capacitor.nativePromise('Widgets', 'installUpdate', {});
+    if (result?.needsPermission) toast('Allow Converter to install updates, then tap Install again');
+    else toast('Installing… the app restarts when it’s done');
+  } catch (error) {
+    toast(error?.message || 'Couldn’t install the update');
+  }
+}
+
+$('#update-btn').addEventListener('click', () => {
+  const action = $('#update-btn').dataset.action;
+  if (action === 'install') installAppUpdate();
+  else if (action === 'download') window.open('https://github.com/RotFarmer/currency-converter-/releases/tag/android-latest', '_blank');
+  else checkAppUpdate({ manual: true });
+});
+$('#update-card-install').addEventListener('click', installAppUpdate);
+// Check when the app opens, and again when you come back to it.
+if (isNativeApp) {
+  setTimeout(checkAppUpdate, 2500);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkAppUpdate();
+  });
+}
 
 // First launch: ask for the home currency (then "prices in" follows the location).
 if (!settings.homeChosen) setTimeout(openHomeChooser, 300);

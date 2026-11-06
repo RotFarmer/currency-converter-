@@ -85,6 +85,11 @@
     <main>
       <!-- Convert -->
       <section class="view" data-view="convert" aria-labelledby="view-title">
+        <div class="panel welcome" id="update-card" hidden>
+          <p id="update-card-text">A new version of the app is ready.</p>
+          <button type="button" class="btn btn-small btn-primary" id="update-card-install">Install update</button>
+        </div>
+
         <div class="panel welcome" id="welcome" hidden>
           <p>Choose your <strong>home currency</strong>. Everything you type or scan is converted to it.</p>
           <button type="button" class="btn btn-small btn-primary" id="welcome-choose">Choose home currency</button>
@@ -389,6 +394,19 @@
           <button type="button" class="list-row" id="refresh-rates">
             <span class="row-text"><span class="row-label accent">Refresh rates now</span></span>
             <svg class="row-chevron"><use href="#i-refresh"/></svg>
+          </button>
+        </div>
+
+        <!-- In the Android app: its version and updates -->
+        <div class="panel list" id="app-panel" hidden>
+          <div class="panel-head"><span>App</span><span id="app-version-name"></span></div>
+          <div class="list-row static">
+            <span class="row-text"><span class="row-label" id="update-title">Updates</span>
+              <span class="row-hint" id="update-hint">The app keeps itself up to date.</span></span>
+          </div>
+          <button type="button" class="list-row" id="update-btn">
+            <span class="row-text"><span class="row-label accent" id="update-btn-label">Check for updates</span></span>
+            <svg class="row-chevron"><use id="update-btn-icon" href="#i-refresh"/></svg>
           </button>
         </div>
 

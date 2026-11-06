@@ -87,14 +87,22 @@ jobs:
           PERMANENT_KEY: ${{ steps.signing.outputs.permanent }}
         run: |
           cp android-app/android/app/build/outputs/apk/release/app-release.apk Converter.apk
+          # version.json tells installed apps about this build: its number, and the key it's signed with
+          # (Android only installs an update signed with the same key).
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          CERT=$("$BUILD_TOOLS/apksigner" verify --print-certs Converter.apk | grep -m1 'SHA-256 digest' | awk '{print $NF}')
+          cat > version.json <<JSON
+          {"versionCode": ${{ github.run_number }}, "versionName": "1.0.${{ github.run_number }}", "certSha256": "$CERT", "permanentKey": ${PERMANENT_KEY:-false}, "apk": "https://github.com/RotFarmer/currency-converter-/releases/download/android-latest/Converter.apk"}
+          JSON
+          cat version.json
           NOTES="Open this page on your Android phone, tap **Converter.apk** to download it, then open the file to install. The first time, Android asks you to allow installs from your browser."
           if [ "$PERMANENT_KEY" = "true" ]; then
-            NOTES="$NOTES Updates install over the old version and keep your settings."
+            NOTES="$NOTES Updates install over the old version and keep your settings. Once installed, the app updates itself."
           else
             NOTES="$NOTES This build is signed with a temporary key: to install a newer build, remove the old app first."
           fi
           gh release delete android-latest --yes --cleanup-tag || true
-          gh release create android-latest Converter.apk \
+          gh release create android-latest Converter.apk version.json \
             --target "$(git rev-parse HEAD)" \
             --title "Converter for Android (build ${{ github.run_number }})" \
             --notes "$NOTES"
