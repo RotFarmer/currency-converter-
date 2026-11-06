@@ -3,10 +3,12 @@
 A currency converter for your phone, with a dark, minimal mech-HUD look. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
 
 - **Default currency.** Pick your home currency and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
-- **Scan prices with the camera.** Take a photo of a price tag, menu or receipt. Each price is found and covered with its converted amount, right on the photo. Tap a price to fix a misread number or change its currency.
+- **Live camera.** Point the in-app camera at price tags or a menu and converted prices appear on screen as you move. Tap the shutter for a full scan with translation.
+- **Scan photos.** Take a photo (or pick one) of a price tag, menu or receipt. Each price is found and covered with its converted amount, right on the photo. Tap a price to fix a misread number or change its currency.
 - **Translates what it reads.** Menu items and signs are translated into your language. The **Text** view lays the translations over the photo, each price in the list shows its translated item name, and a list of every line is shown below the photo.
 - **Works out the currency from the language.** Japanese text means yen, Thai means baht, Hebrew means shekels, and so on. It reads Latin-alphabet languages plus Japanese, Chinese, Korean, Thai, Hebrew, Arabic, Russian/Ukrainian, Greek and Hindi. If it guesses the language wrong, tap **LANG** to pick it.
 - **Understands currency signs.** It recognises €, £, ¥, $, ₪, ₹, kr, zł, 円, 원, บาท, ש״ח, руб, codes like `USD` or `CHF`, and formats like `1.280,50 €` or `12.-`. A price without a sign uses the currency most other prices on the same photo show, then the language's currency, then your "Prices in" setting.
+- **Install prompt.** On first visit it offers to install itself: a real install button on Android/Chrome, step-by-step Add to Home Screen instructions on iPhone (Apple doesn't let websites install themselves).
 - **Works offline.** Install it to your home screen. Exchange rates are saved on the phone, and the text reader is cached after its first download. Translation needs a connection.
 - **Private.** Text is read on the phone itself with [Tesseract.js](https://github.com/naptha/tesseract.js). Photos are never uploaded. For translation, only the recognised text is sent to the translator.
 
@@ -14,12 +16,14 @@ It's a web app (PWA), so it runs on iPhone and Android with no app store and no 
 
 ## Using it on your phone
 
-1. Open the app's web address in Safari (iPhone) or Chrome (Android).
-2. Install it:
-   - **iPhone:** tap the Share button, then **Add to Home Screen**.
-   - **Android:** tap **Install now** in Settings inside the app, or use Chrome's menu.
+1. Open **https://rotfarmer.github.io/currency-converter-/** in Safari (iPhone) or Chrome (Android).
+2. Install it when the prompt appears (or later from Settings → Install):
+   - **iPhone:** tap Share (on newer iPhones, ••• first), then **Add to Home Screen**.
+   - **Android:** tap **Install**.
 3. Choose your **default currency** and the currency **prices are in** (the local currency where you are).
-4. Type an amount on the **Convert** tab, or open **Scan** and take a photo.
+4. Type an amount on the **Convert** tab, or open **Scan** and use the **Live camera**. Allow camera access when asked.
+
+The live view reads prices with a sign (¥, €, $ …) about once a second. Prices written with a local currency word, such as 1,080円, are picked up by the full scan after you tap the shutter.
 
 Tips for scanning: get close enough that prices fill a good part of the photo, hold steady and use decent light. The first scan downloads the text reader (about 6 MB). A photo in a non-Latin script also downloads that script's model (1–3 MB) the first time.
 
@@ -55,6 +59,7 @@ Project layout:
 | --- | --- |
 | `index.html`, `css/styles.css` | Page structure and the HUD theme |
 | `js/app.js` | Screens, settings and user interaction |
+| `js/camera.js` | The in-app live camera (start/stop, flashlight, grabbing frames) |
 | `js/scan.js` | Photo pipeline: prices, language identification, re-reading in the right script |
 | `js/ocr.js` | Prepares photos and runs Tesseract.js (loaded on demand from jsDelivr) |
 | `js/price-parser.js` | Finds prices and their currencies in recognised text |

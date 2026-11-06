@@ -10,7 +10,8 @@ import {
 import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
-import { photoToCanvas, preloadOcr } from './ocr.js';
+import { photoToCanvas, preloadOcr, readText } from './ocr.js';
+import { cameraSupported, startCamera, stopCamera, torchSupported, setTorch, grabFrame } from './camera.js';
 import { readPrices, identifyLanguage, readInLanguage, mergePrices } from './scan.js';
 import { textLines, labelFor } from './layout.js';
 import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
@@ -139,6 +140,7 @@ function closeSheet(sheet, { fromHistory = false } = {}) {
   sheet.hidden = true;
   openSheets.splice(openSheets.indexOf(sheet), 1);
   if (!openSheets.length) document.body.style.overflow = '';
+  sheet.dispatchEvent(new Event('sheetclose'));
   if (!fromHistory && history.state?.sheet === sheet.id) {
     ignoredPops++;
     history.back();
@@ -406,42 +408,39 @@ function languageCurrency() {
   return settings.guessCurrency && scan.language ? currencyForLanguage(scan.language, settings.source) : null;
 }
 
-/** How ambiguous signs ($, ¥, kr) are read: the language's currency, else the user's setting. */
-function signBase() {
-  return languageCurrency() || settings.source;
-}
-
-/** The currency a detected sign stands for on this photo. */
-function resolveSign(candidates) {
-  const base = signBase();
+/**
+ * The currency a detected sign stands for. Ambiguous signs ($, ¥, kr) follow the language's
+ * currency, else the user's setting.
+ */
+function resolveSign(candidates, langCurrency) {
+  const base = langCurrency || settings.source;
   // ₩ and ¥ look alike; on a Korean menu a "¥" is almost certainly a misread won sign.
   if (base === 'KRW' && candidates.includes('JPY')) return 'KRW';
   return resolveCurrency(candidates, base);
 }
 
 /**
- * The currency for prices without a sign, and why: the currency most signed prices on the
- * same photo use ("signs"), else the text's language ("language"), else the setting.
+ * The currency for prices without a sign, and why: the currency most signed prices in the
+ * same picture use ("signs"), else the text's language ("language"), else the setting.
  */
-function photoCurrency() {
+function photoCurrency(items = scan.items, langCurrency = languageCurrency()) {
   if (settings.detectCurrency) {
     const counts = new Map();
-    for (const item of scan.items) {
+    for (const item of items) {
       if (!item.candidates || item.fixedCurrency) continue;
-      const code = resolveSign(item.candidates);
+      const code = resolveSign(item.candidates, langCurrency);
       counts.set(code, (counts.get(code) || 0) + 1);
     }
     const total = [...counts.values()].reduce((sum, n) => sum + n, 0);
     for (const [code, n] of counts) if (n / total >= 0.6) return { code, reason: 'signs' };
   }
-  const fromLanguage = languageCurrency();
-  return fromLanguage ? { code: fromLanguage, reason: 'language' } : { code: settings.source, reason: 'setting' };
+  return langCurrency ? { code: langCurrency, reason: 'language' } : { code: settings.source, reason: 'setting' };
 }
 
-function currencyOf(item) {
+function currencyOf(item, items = scan.items, langCurrency = languageCurrency()) {
   if (item.fixedCurrency) return item.fixedCurrency;
-  if (item.candidates && settings.detectCurrency) return resolveSign(item.candidates);
-  return photoCurrency().code;
+  if (item.candidates && settings.detectCurrency) return resolveSign(item.candidates, langCurrency);
+  return photoCurrency(items, langCurrency).code;
 }
 
 function setItems(prices) {
@@ -473,14 +472,18 @@ function translatedLabel(item) {
 }
 
 async function handlePhoto(file) {
-  if (!file) return;
+  if (file) await startScan((canvas) => photoToCanvas(file, canvas));
+}
+
+/** Put a picture on the scan screen (via `draw`) and read it. */
+async function startScan(draw) {
   const run = ++scan.run;
   showTab('scan');
   Object.assign(scan, { status: 'reading', items: [], error: null, hasPhoto: true, mode: 'converted' });
   setProgress('Opening photo…', 0);
   renderScan();
   try {
-    await photoToCanvas(file, photo);
+    await draw(photo);
     updatePhotoScale();
   } catch (error) {
     if (run !== scan.run) return;
@@ -834,6 +837,149 @@ $('#lang-button').addEventListener('click', () => {
 
 $('#lang-set-local').addEventListener('click', () => setCurrency('source', photoCurrency().code));
 
+/* ---------- Live camera ---------- */
+// Reads prices from the camera feed a frame at a time and pins converted amounts on screen.
+// The shutter hands the current frame to the full scan (language, translation, editing).
+
+const cameraEl = $('#camera');
+const video = $('#camera-video');
+const live = { session: 0, items: [], frameW: 1, frameH: 1, torch: false };
+const LIVE_SIDE = 1000; // frame size for live reading: smaller is faster
+
+function setCameraStatus(text) {
+  $('#camera-status').textContent = text;
+}
+
+async function openCamera() {
+  if (!cameraSupported()) {
+    toast('Live camera isn’t available here. Use Camera app or Photos instead.');
+    return;
+  }
+  const session = ++live.session;
+  Object.assign(live, { items: [], torch: false });
+  renderLiveTags();
+  setCameraStatus('Starting camera…');
+  $('#camera-torch').hidden = true;
+  openSheet(cameraEl);
+  try {
+    await startCamera(video);
+  } catch (error) {
+    if (session !== live.session) return;
+    closeSheet(cameraEl);
+    toast(
+      error?.name === 'NotAllowedError'
+        ? 'Camera access is blocked. Allow it for this site in your browser settings.'
+        : 'Couldn’t start the camera. Use Camera app or Photos instead.'
+    );
+    return;
+  }
+  if (session !== live.session) return;
+  $('#camera-torch').hidden = !torchSupported();
+  $('#camera-torch').setAttribute('aria-pressed', 'false');
+  liveLoop(session);
+}
+
+async function liveLoop(session) {
+  const frame = document.createElement('canvas');
+  let first = true;
+  setCameraStatus(ocrWarm ? 'Point at prices' : 'Loading text reader…');
+  while (session === live.session) {
+    if (video.readyState < 2 || !video.videoWidth || document.hidden) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      continue;
+    }
+    grabFrame(video, frame, LIVE_SIDE);
+    cameraEl.classList.add('reading');
+    try {
+      const lines = await readText(frame, first ? ({ status }) => {
+        if (session === live.session && status !== 'recognizing text') setCameraStatus('Loading text reader (first time only)…');
+      } : null);
+      if (session !== live.session) return;
+      first = false;
+      ocrWarm = true;
+      live.items = findPrices(lines, parseOptions());
+      live.frameW = frame.width;
+      live.frameH = frame.height;
+      const count = live.items.length;
+      setCameraStatus(count ? `${count} price${count === 1 ? '' : 's'}` : 'Point at prices');
+      renderLiveTags();
+    } catch {
+      if (session !== live.session) return;
+      setCameraStatus('Text reader unavailable offline. You can still capture.');
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    } finally {
+      cameraEl.classList.remove('reading');
+    }
+  }
+}
+
+function renderLiveTags() {
+  // The video fills the screen with object-fit: cover, so map frame pixels the same way.
+  const cw = cameraEl.clientWidth;
+  const ch = cameraEl.clientHeight;
+  const scale = Math.max(cw / live.frameW, ch / live.frameH);
+  const ox = (cw - live.frameW * scale) / 2;
+  const oy = (ch - live.frameH * scale) / 2;
+  $('#camera-tags').innerHTML = live.items
+    .map((item) => {
+      const { x0, y0, x1, y1 } = item.bbox;
+      const h = (y1 - y0) * scale;
+      const converted = formatMoney(convert(item.amount, currencyOf(item, live.items, null), settings.home), settings.home);
+      const style = [
+        `left:${ox + ((x0 + x1) / 2) * scale}px`,
+        `top:${oy + ((y0 + y1) / 2) * scale}px`,
+        `min-width:${(x1 - x0) * scale * 1.08 + 8}px`,
+        `min-height:${h * 1.12 + 4}px`,
+        `font-size:${Math.max(13, Math.min(32, h * 0.75))}px`,
+      ].join(';');
+      return `<div class="live-tag${item.confidence === 'low' ? ' low' : ''}" style="${style}">${escapeHtml(converted)}</div>`;
+    })
+    .join('');
+}
+
+cameraEl.addEventListener('sheetclose', () => {
+  live.session++;
+  live.items = [];
+  stopCamera(video);
+});
+
+$('#camera-torch').addEventListener('click', async () => {
+  live.torch = !live.torch;
+  try {
+    await setTorch(live.torch);
+  } catch {
+    live.torch = false;
+  }
+  $('#camera-torch').setAttribute('aria-pressed', String(live.torch));
+});
+
+$('#camera-shutter').addEventListener('click', () => {
+  if (!video.videoWidth) return;
+  const shot = grabFrame(video, document.createElement('canvas'), 2000);
+  closeSheet(cameraEl);
+  startScan(async (canvas) => {
+    canvas.width = shot.width;
+    canvas.height = shot.height;
+    canvas.getContext('2d').drawImage(shot, 0, 0);
+  });
+});
+
+for (const button of $$('[data-live-camera]')) {
+  button.hidden = !cameraSupported();
+  button.addEventListener('click', openCamera);
+}
+
+window.addEventListener('resize', () => {
+  if (!cameraEl.hidden) renderLiveTags();
+});
+
+// Phones pause the camera in the background; restart it when the app comes back.
+document.addEventListener('visibilitychange', () => {
+  if (cameraEl.hidden) return;
+  if (document.hidden) stopCamera(video);
+  else startCamera(video).catch(() => closeSheet(cameraEl));
+});
+
 /* ---------- Edit a scanned price ---------- */
 
 const priceSheet = $('#price-sheet');
@@ -938,32 +1084,76 @@ $('#translate-to').addEventListener('click', () => {
 $('#refresh-rates').addEventListener('click', () => updateRates({ manual: true }));
 $('#rates-pill').addEventListener('click', () => updateRates({ manual: true }));
 
+/* ---------- Install prompt ---------- */
+// Chrome and Edge offer a real install dialog (beforeinstallprompt). iPhones don't let websites
+// trigger one, so there the prompt shows the Add to Home Screen steps instead.
+
+const installSheet = $('#install-sheet');
+const ua = navigator.userAgent;
+const isIos = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isFirefoxAndroid = /Android/i.test(ua) && /Firefox/i.test(ua);
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installPrompt = null;
+
+function installKind() {
+  if (isStandalone()) return null;
+  if (installPrompt) return 'native';
+  if (isIos) return 'ios';
+  if (isFirefoxAndroid) return 'menu';
+  return null;
+}
+
+function openInstallSheet() {
+  const kind = installKind();
+  if (!kind) return;
+  $('#install-steps-ios').hidden = kind !== 'ios';
+  $('#install-steps-menu').hidden = kind !== 'menu';
+  $('#install-now').hidden = kind !== 'native';
+  $('#install-later').textContent = kind === 'native' ? 'Not now' : 'Got it';
+  $('#install-later').className = `btn ${kind === 'native' ? 'btn-ghost' : 'btn-primary'}`;
+  save('installPromptShown', Date.now());
+  openSheet(installSheet);
+}
+
+/** Show the prompt on its own, unless it was shown recently or the app is installed. */
+function maybePromptInstall() {
+  const kind = installKind();
+  if (!kind || load('installed', false) || openSheets.length) return;
+  // Wait a few days before asking again (a week where we can only show instructions).
+  const wait = (kind === 'native' ? 3 : 7) * 24 * 60 * 60 * 1000;
+  if (Date.now() - load('installPromptShown', 0) < wait) return;
+  openInstallSheet();
+}
+
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault();
   installPrompt = event;
   renderInstall();
+  setTimeout(maybePromptInstall, 1000);
 });
 window.addEventListener('appinstalled', () => {
   installPrompt = null;
+  save('installed', true);
+  closeSheet(installSheet);
   renderInstall();
+  toast('Installed. Find Converter on your home screen.');
 });
-$('#install-btn').addEventListener('click', async () => {
-  if (!installPrompt) return;
-  installPrompt.prompt();
-  await installPrompt.userChoice.catch(() => {});
+$('#install-now').addEventListener('click', async () => {
+  const prompt = installPrompt;
+  if (!prompt) return;
+  prompt.prompt();
+  const choice = await prompt.userChoice.catch(() => null);
   installPrompt = null;
+  closeSheet(installSheet);
+  if (choice?.outcome === 'accepted') save('installed', true);
   renderInstall();
 });
+$('#install-btn').addEventListener('click', openInstallSheet);
 
 function renderInstall() {
-  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  $('#install-card').hidden = standalone || (!installPrompt && !ios);
-  $('#install-btn').hidden = !installPrompt;
-  $('#install-hint').textContent = installPrompt
-    ? 'One-tap access and offline use.'
-    : 'In Safari, tap the Share button, then “Add to Home Screen”.';
+  const kind = installKind();
+  $('#install-card').hidden = !kind;
+  $('#install-btn-label').textContent = kind === 'native' ? 'Install app' : 'Show me how';
 }
 
 /* ---------- Shared rendering ---------- */
@@ -1021,7 +1211,7 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (event.target.closest('[data-close]')) {
-    closeSheet(event.target.closest('.sheet-backdrop'));
+    closeSheet(event.target.closest('.sheet-backdrop, .camera'));
     return;
   }
   if (event.target.classList.contains('sheet-backdrop')) closeSheet(event.target);
@@ -1044,6 +1234,9 @@ window.addEventListener('online', () => {
 saveSettings();
 renderAll();
 if (ratesAreStale()) updateRates();
+
+if (isStandalone()) save('installed', true);
+else if (isIos || isFirefoxAndroid) setTimeout(maybePromptInstall, 1500);
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

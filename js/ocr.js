@@ -216,6 +216,7 @@ export async function readText(canvas, onProgress, { mode = 'gray', lang = 'eng'
     }
     return lines;
   } finally {
-    progressListener = null;
+    // Another read (e.g. the live camera) may have started meanwhile; leave its listener alone.
+    if (progressListener === onProgress) progressListener = null;
   }
 }

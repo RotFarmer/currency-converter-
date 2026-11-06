@@ -30,6 +30,10 @@
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><path d="M5 5h10v10H5zM15 15l5 5"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H4v11h16V10h-3"/></symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 8v8M8 12h8"/></symbol>
+    <symbol id="i-torch" viewBox="0 0 24 24"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z"/><path d="M12 13v2"/></symbol>
+    <symbol id="i-live" viewBox="0 0 24 24"><path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5"/><path d="M9 12h6M12 9v6"/></symbol>
   </svg>
 
   <div class="app">
@@ -104,17 +108,22 @@
               <text x="80" y="57" text-anchor="middle">€4.90</text>
             </svg>
           </div>
-          <p>Photograph a price tag, menu or receipt. Prices convert to
-            <strong data-chip-text="home">USD</strong> and foreign text is translated.</p>
+          <p>Point the live camera at price tags or a menu: prices convert to
+            <strong data-chip-text="home">USD</strong> on screen. Tap the shutter for a full scan with translation.</p>
           <div class="scan-actions">
-            <label class="btn btn-primary btn-large">
-              <input type="file" accept="image/*" capture="environment" class="file-input" data-photo-input>
-              <svg><use href="#i-camera"/></svg> Take photo
-            </label>
-            <label class="btn btn-secondary">
-              <input type="file" accept="image/*" class="file-input" data-photo-input>
-              <svg><use href="#i-photos"/></svg> Choose from photos
-            </label>
+            <button type="button" class="btn btn-primary btn-large" data-live-camera>
+              <svg><use href="#i-live"/></svg> Live camera
+            </button>
+            <div class="scan-actions-row">
+              <label class="btn btn-secondary">
+                <input type="file" accept="image/*" capture="environment" class="file-input" data-photo-input>
+                <svg><use href="#i-camera"/></svg> Camera app
+              </label>
+              <label class="btn btn-secondary">
+                <input type="file" accept="image/*" class="file-input" data-photo-input>
+                <svg><use href="#i-photos"/></svg> Photos
+              </label>
+            </div>
           </div>
           <p class="hint">Prices without a sign follow the other prices on the photo, then the text’s language,
             then <button type="button" class="link-btn" data-pick="source" data-chip-text="source">EUR</button>.</p>
@@ -159,13 +168,12 @@
             <div id="translation-list"></div>
           </div>
           <div class="scan-actions scan-actions-row">
-            <label class="btn btn-primary">
-              <input type="file" accept="image/*" capture="environment" class="file-input" data-photo-input>
-              <svg><use href="#i-camera"/></svg> New photo
-            </label>
+            <button type="button" class="btn btn-primary" data-live-camera>
+              <svg><use href="#i-live"/></svg> Live camera
+            </button>
             <label class="btn btn-secondary">
               <input type="file" accept="image/*" class="file-input" data-photo-input>
-              <svg><use href="#i-photos"/></svg> From photos
+              <svg><use href="#i-photos"/></svg> Photo
             </label>
           </div>
         </div>
@@ -227,12 +235,9 @@
 
         <div class="panel list" id="install-card" hidden>
           <div class="panel-head"><span>Install</span></div>
-          <div class="list-row static">
-            <span class="row-text"><span class="row-label">Add to home screen</span>
-              <span class="row-hint" id="install-hint">One-tap access and offline use.</span></span>
-          </div>
-          <button type="button" class="list-row" id="install-btn" hidden>
-            <span class="row-text"><span class="row-label accent">Install now</span></span>
+          <button type="button" class="list-row" id="install-btn">
+            <span class="row-text"><span class="row-label accent" id="install-btn-label">Install app</span>
+              <span class="row-hint">Home-screen icon, full screen, works offline</span></span>
             <svg class="row-chevron"><use href="#i-chevron"/></svg>
           </button>
         </div>
@@ -291,6 +296,53 @@
         <button type="button" class="btn btn-ghost danger" id="price-remove">Remove</button>
         <button type="button" class="btn btn-secondary" id="price-open">Open in converter</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Install prompt -->
+  <div class="sheet-backdrop" id="install-sheet" hidden>
+    <div class="sheet sheet-bottom" role="dialog" aria-modal="true" aria-labelledby="install-title">
+      <div class="sheet-header">
+        <h2 id="install-title">Install app</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="install-intro">
+        <img src="icons/icon-192.png" alt="" width="60" height="60">
+        <p>Put Converter on your home screen. It opens full screen in one tap and works offline.</p>
+      </div>
+      <ol class="install-steps" id="install-steps-ios" hidden>
+        <li>Tap <span class="key"><svg><use href="#i-share"/></svg>Share</span> in Safari. On newer iPhones, tap
+          <span class="key">•••</span> first.</li>
+        <li>Scroll down and tap <span class="key"><svg><use href="#i-add"/></svg>Add to Home Screen</span>.</li>
+        <li>Tap <span class="key">Add</span>.</li>
+      </ol>
+      <ol class="install-steps" id="install-steps-menu" hidden>
+        <li>Open the browser menu <span class="key">⋮</span>.</li>
+        <li>Tap <span class="key">Install</span> or <span class="key">Add to Home screen</span>.</li>
+      </ol>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost" data-close id="install-later">Not now</button>
+        <button type="button" class="btn btn-primary" id="install-now">Install</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live camera -->
+  <div class="camera" id="camera" hidden role="dialog" aria-modal="true" aria-label="Live camera">
+    <video id="camera-video" playsinline muted autoplay></video>
+    <div class="camera-frame" aria-hidden="true"></div>
+    <div class="camera-tags" id="camera-tags" aria-live="polite"></div>
+    <div class="camera-top">
+      <span class="live-badge">Live</span>
+      <span class="camera-status" id="camera-status">Starting camera…</span>
+      <button type="button" class="cam-btn" data-close aria-label="Close camera"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="camera-bottom">
+      <button type="button" class="cam-btn" id="camera-torch" aria-label="Flashlight" aria-pressed="false" hidden>
+        <svg><use href="#i-torch"/></svg>
+      </button>
+      <button type="button" class="shutter" id="camera-shutter" aria-label="Capture and scan with translation"></button>
+      <span class="cam-hint">Full scan</span>
     </div>
   </div>
 
