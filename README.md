@@ -2,7 +2,9 @@
 
 A currency converter for your phone, with a dark, minimal mech-HUD look. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
 
-- **Default currency.** Pick your home currency and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
+- **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
+- **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
+- **Quick reference tabs.** A ready-made table of common amounts, with a tab per currency (home plus your extras). Swipe left/right or tap a tab to switch.
 - **Up to 10 other currencies.** Tap ☰ **Other currencies** between the two amounts to open a drawer with your extra currencies. Tap **+** to add one (up to 10) and **×** to remove one; whatever you type is shown in each of them.
 - **Live camera.** Point the in-app camera at price tags or a menu and converted prices appear on screen as you move. Tap the shutter for a full scan with translation.
 - **Scan photos.** Take a photo (or pick one) of a price tag, menu or receipt. Each price is found and covered with its converted amount, right on the photo. Tap a price to fix a misread number or change its currency.
@@ -21,7 +23,7 @@ It's a web app (PWA), so it runs on iPhone and Android with no app store and no 
 2. Install it when the prompt appears, or any time with the **Install** button at the top:
    - **iPhone:** tap Share (on newer iPhones, ••• first), then **Add to Home Screen**.
    - **Android:** tap **Install**.
-3. Choose your **default currency** and the currency **prices are in** (the local currency where you are).
+3. Choose your **home currency** when asked. Allow location if you'd like GPS to set the local currency (without it, the phone's time zone is used).
 4. Type an amount on the **Convert** tab, or open **Scan** and use the **Live camera**. Allow camera access when asked.
 
 The live view reads prices with a sign (¥, €, $ …) about once a second. Prices written with a local currency word, such as 1,080円, are picked up by the full scan after you tap the shutter.
@@ -68,7 +70,9 @@ Project layout:
 | `js/layout.js` | Matches each price with its item name on the photo |
 | `js/translate.js` | Translation (on-device or MyMemory) |
 | `js/rates.js` | Downloads and caches exchange rates |
-| `js/currencies.js` | Currency names, symbols and decimals |
+| `js/currencies.js` | Currency names, symbols, decimals and the currency of each country |
+| `js/location.js` | Works out the country: GPS + reverse geocoding, or the time zone |
+| `js/timezones.js` | Time zone → country table (generated from the IANA time zone database) |
 | `js/format.js` | Number formatting and parsing |
 | `sw.js` | Service worker for offline use |
 | `fonts/` | Share Tech Mono and Chakra Petch (SIL Open Font License) |

@@ -361,7 +361,7 @@ main { padding: 16px 16px 0; }
   outline: none;
   caret-color: var(--accent);
 }
-.amount-input::placeholder { color: var(--text-faint); text-shadow: none; }
+.amount-input::placeholder { color: var(--accent); opacity: 0.45; text-shadow: none; }
 .amount-input:focus { border-bottom-color: var(--accent); background: linear-gradient(transparent 70%, var(--accent-soft)); }
 
 .clear-btn {
@@ -483,6 +483,31 @@ main { padding: 16px 16px 0; }
 .ref-row:active, .ref-row:hover { background: var(--accent-soft); }
 .ref-row:active span:last-child { color: var(--accent); }
 .empty-note { margin: 0; color: var(--text-dim); font-size: 14px; }
+
+.ref-tabs { display: flex; gap: 6px; margin: -2px 0 10px; padding-bottom: 2px; overflow-x: auto; scrollbar-width: none; }
+.ref-tabs::-webkit-scrollbar { display: none; }
+.ref-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+}
+.ref-tab .glyph { font-size: 12px; opacity: 0.8; }
+.ref-tab[aria-selected="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.ref-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.ref-track::-webkit-scrollbar { display: none; }
+.ref-page { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.ref-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+.ref-dots:empty { display: none; }
+.ref-dot { width: 6px; height: 6px; background: var(--line-strong); }
+.ref-dot.active { background: var(--accent); box-shadow: 0 0 6px var(--glow); }
 
 /* ---------- Scan ---------- */
 

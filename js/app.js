@@ -6,7 +6,10 @@ import {
   searchCurrencies,
   guessHomeCurrency,
   normalize,
+  currencyForRegion,
+  regionName,
 } from './currencies.js';
+import { detectRegion } from './location.js';
 import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
@@ -18,7 +21,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v6'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v7'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -43,7 +46,9 @@ const settings = {
   recent: [],
   extra: [], // up to 10 more currencies, kept in the ☰ drawer between the two amounts
   extraOpen: false,
-  welcomed: false,
+  homeChosen: false, // the user picked their home currency themselves
+  autoSource: true, // keep "prices in" set to the currency where the phone is
+  sourceRegion: null, // country detected for "prices in"
   ...load('settings', {}),
 };
 settings.home ||= guessHomeCurrency();
@@ -58,11 +63,45 @@ function rememberRecent(code) {
 }
 
 function setCurrency(role, code) {
+  const firstHome = role === 'home' && !settings.homeChosen;
   settings[role] = code;
-  if (role === 'home') settings.welcomed = true;
+  if (role === 'home') settings.homeChosen = true;
+  if (role === 'source') settings.autoSource = false; // the user chose it, so stop following location
   rememberRecent(code);
   saveSettings();
   renderAll();
+  if (firstHome) detectSource({ askPermission: true });
+}
+
+/* ---------- Home currency and location ---------- */
+
+let lastDetect = 0;
+
+/** Set "prices in" to the currency of the country the phone is in. */
+async function detectSource({ askPermission = false } = {}) {
+  if (!settings.autoSource) return;
+  lastDetect = Date.now();
+  const found = await detectRegion({ askPermission });
+  const code = currencyForRegion(found?.region);
+  if (!code || !CURRENCY_CODES.has(code) || !settings.autoSource) return;
+  const changed = code !== settings.source;
+  settings.source = code;
+  settings.sourceRegion = found.region;
+  saveSettings();
+  renderAll();
+  if (changed) toast(`Prices in ${code} · ${regionName(found.region)}`);
+}
+
+function openHomeChooser() {
+  openPicker({
+    title: 'Your home currency',
+    items: currencyItems(),
+    selected: settings.homeChosen ? settings.home : null,
+    suggested: [guessHomeCurrency()],
+    recent: settings.recent,
+    placeholder: 'Search currency or country',
+    onSelect: (code) => setCurrency('home', code),
+  });
 }
 
 /* ---------- Rates ---------- */
@@ -213,8 +252,8 @@ function languageItems(codes) {
   });
 }
 
-function openPicker({ title, items, selected, onSelect, recent = [], placeholder = 'Search' }) {
-  pickerState = { items, selected, onSelect, recent };
+function openPicker({ title, items, selected, onSelect, recent = [], suggested = [], placeholder = 'Search' }) {
+  pickerState = { items, selected, onSelect, recent, suggested };
   $('#picker-title').textContent = title;
   pickerSearch.value = '';
   pickerSearch.placeholder = placeholder;
@@ -226,7 +265,7 @@ function openPicker({ title, items, selected, onSelect, recent = [], placeholder
 
 function renderPickerList() {
   const query = pickerSearch.value.trim();
-  const { items, selected, recent } = pickerState;
+  const { items, selected, recent, suggested } = pickerState;
   const isSelected = (code) => code === selected;
   const list = searchCurrencies(query, items);
   const row = (item) => `
@@ -237,8 +276,11 @@ function renderPickerList() {
       ${isSelected(item.code) ? '<svg aria-hidden="true"><use href="#i-check"/></svg>' : ''}
     </button>`;
   let html = '';
-  if (!query && recent.length) {
-    const recentItems = recent.map((code) => items.find((i) => i.code === code)).filter(Boolean);
+  if (!query && (recent.length || suggested.length)) {
+    const pick = (codes) => codes.map((code) => items.find((i) => i.code === code)).filter(Boolean);
+    const suggestedItems = pick(suggested);
+    const recentItems = pick(recent.filter((code) => !suggested.includes(code)));
+    if (suggestedItems.length) html += `<div class="picker-section">Suggested</div>${suggestedItems.map(row).join('')}`;
     if (recentItems.length) html += `<div class="picker-section">Recent</div>${recentItems.map(row).join('')}`;
     html += '<div class="picker-section">All</div>';
   }
@@ -310,9 +352,8 @@ function renderExtraCurrencies() {
   if (!settings.extraOpen) return;
   $('#extra-limit').textContent = `${count}/${MAX_EXTRA}`;
   $('#extra-add').hidden = count >= MAX_EXTRA;
-  const typed = sourceAmount();
-  const amount = typed ?? 1; // with nothing typed, show what 1 unit is worth
-  $('#extra-basis').textContent = typed == null ? `Per 1 ${source}` : `For ${formatMoney(typed, source)}`;
+  const amount = sourceAmount() ?? 0;
+  $('#extra-basis').textContent = `For ${formatMoney(amount, source)}`;
   $('#extra-list').innerHTML = count
     ? settings.extra
         .map((code) => {
@@ -333,6 +374,7 @@ function renderExtraCurrencies() {
 function saveExtra() {
   saveSettings();
   renderExtraCurrencies();
+  renderReference();
 }
 
 $('#extra-menu').addEventListener('click', () => {
@@ -374,27 +416,89 @@ function renderRateLine() {
   el.textContent = `${units.toLocaleString()} ${source} = ${formatRate(rate * units)} ${home}`;
 }
 
-function renderReference() {
-  const el = $('#reference');
-  const { source, home } = settings;
-  const homeInSource = convert(1, home, source);
-  if (homeInSource == null) {
-    el.innerHTML = '<p class="empty-note">Exchange rates download automatically when you’re online.</p>';
-    return;
-  }
-  if (source === home) {
-    el.innerHTML = '<p class="empty-note">Pick a different “Price in” currency to see a conversion table.</p>';
-    return;
-  }
-  const base = 10 ** Math.max(0, Math.floor(Math.log10(homeInSource)));
+// Quick reference: one swipeable page per currency (home first, then the ☰ extras).
+const refTrack = $('#reference');
+const refTabs = $('#ref-tabs');
+let refActive = null; // currency of the page on screen
+
+function referenceTargets() {
+  return [settings.home, ...settings.extra].filter((code, i, all) => code !== settings.source && all.indexOf(code) === i);
+}
+
+function referenceTable(target) {
+  const { source } = settings;
+  const targetInSource = convert(1, target, source);
+  const base = 10 ** Math.max(0, Math.floor(Math.log10(targetInSource)));
   const rows = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000].map((step) => {
     const amount = step * base;
     return `<button type="button" class="ref-row" data-amount="${amount}">
-      <span>${formatMoney(amount, source)}</span><span>${formatMoney(convert(amount, source, home), home)}</span>
+      <span>${formatMoney(amount, source)}</span><span>${formatMoney(convert(amount, source, target), target)}</span>
     </button>`;
   });
-  el.innerHTML = `<div class="ref-head"><span>${source}</span><span>${home}</span></div>${rows.join('')}`;
+  return `<div class="ref-head"><span>${source}</span><span>${target}</span></div>${rows.join('')}`;
 }
+
+function renderReference() {
+  const { source, home } = settings;
+  const targets = referenceTargets();
+  const ready = convert(1, home, source) != null;
+  refTabs.hidden = !ready || targets.length < 2;
+  $('#ref-hint').textContent = ready && targets.length > 1 ? 'Swipe ← →' : '';
+  $('#ref-dots').innerHTML = '';
+  if (!ready) {
+    refTrack.innerHTML = '<p class="empty-note">Exchange rates download automatically when you’re online.</p>';
+    return;
+  }
+  if (!targets.length) {
+    refTrack.innerHTML = '<p class="empty-note">Pick a different “Price in” currency to see a conversion table.</p>';
+    return;
+  }
+  if (!targets.includes(refActive)) refActive = targets[0];
+  refTabs.innerHTML = targets
+    .map((code) => {
+      const glyph = symbolGlyph(getCurrency(code));
+      return `<button type="button" class="ref-tab" role="tab" data-ref-tab="${code}" aria-selected="${code === refActive}">
+        <span class="glyph" aria-hidden="true">${escapeHtml(glyph)}</span>${code}</button>`;
+    })
+    .join('');
+  refTrack.innerHTML = targets
+    .map((code) => `<div class="ref-page" role="tabpanel" data-ref-page="${code}" aria-label="${source} to ${code}">${referenceTable(code)}</div>`)
+    .join('');
+  if (targets.length > 1) $('#ref-dots').innerHTML = targets.map((code) => `<span class="ref-dot${code === refActive ? ' active' : ''}"></span>`).join('');
+  // Keep showing the same currency after a re-render.
+  refTrack.scrollLeft = targets.indexOf(refActive) * refTrack.clientWidth;
+}
+
+function markReferenceTab(code) {
+  if (code === refActive) return;
+  refActive = code;
+  const targets = referenceTargets();
+  for (const tab of refTabs.querySelectorAll('[data-ref-tab]')) {
+    const active = tab.dataset.refTab === code;
+    tab.setAttribute('aria-selected', String(active));
+    if (active) tab.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }
+  $$('.ref-dot').forEach((dot, i) => dot.classList.toggle('active', targets[i] === code));
+}
+
+// Swiping the table switches currency; the tabs follow.
+let refScrollFrame = 0;
+refTrack.addEventListener('scroll', () => {
+  cancelAnimationFrame(refScrollFrame);
+  refScrollFrame = requestAnimationFrame(() => {
+    const index = Math.round(refTrack.scrollLeft / Math.max(1, refTrack.clientWidth));
+    const code = referenceTargets()[index];
+    if (code) markReferenceTab(code);
+  });
+});
+
+refTabs.addEventListener('click', (event) => {
+  const tab = event.target.closest('[data-ref-tab]');
+  if (!tab) return;
+  const index = referenceTargets().indexOf(tab.dataset.refTab);
+  markReferenceTab(tab.dataset.refTab);
+  refTrack.scrollTo({ left: index * refTrack.clientWidth, behavior: 'smooth' });
+});
 
 for (const input of Object.values(inputs)) {
   input.addEventListener('input', () => {
@@ -414,11 +518,7 @@ $('#reference').addEventListener('click', (event) => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-$('#welcome-ok').addEventListener('click', () => {
-  settings.welcomed = true;
-  saveSettings();
-  $('#welcome').hidden = true;
-});
+$('#welcome-choose').addEventListener('click', openHomeChooser);
 
 /* ---------- Scan ---------- */
 
@@ -1164,6 +1264,13 @@ $('#translate-to').addEventListener('click', () => {
   });
 });
 
+$('#auto-source-toggle').addEventListener('change', (event) => {
+  settings.autoSource = event.target.checked;
+  saveSettings();
+  renderAll();
+  if (settings.autoSource) detectSource({ askPermission: true });
+});
+
 $('#refresh-rates').addEventListener('click', () => updateRates({ manual: true }));
 $('#rates-pill').addEventListener('click', () => updateRates({ manual: true }));
 
@@ -1265,7 +1372,14 @@ function renderAll() {
   for (const el of $$('[data-chip]')) renderChip(el, settings[el.dataset.chip], el.classList.contains('currency-chip'));
   for (const el of $$('[data-chip-text]')) el.textContent = settings[el.dataset.chipText];
   for (const el of $$('[data-name]')) el.textContent = getCurrency(settings[el.dataset.name]).name;
-  $('#welcome').hidden = settings.welcomed;
+  $('#welcome').hidden = settings.homeChosen;
+  $('#auto-source-toggle').checked = settings.autoSource;
+  $('#source-badge').hidden = !(settings.autoSource && settings.sourceRegion);
+  $('#source-hint').textContent = !settings.autoSource
+    ? 'Set by you'
+    : settings.sourceRegion
+      ? `From your location: ${regionName(settings.sourceRegion)}`
+      : 'Detecting where you are…';
   for (const [selector, key] of Object.entries(toggles)) $(selector).checked = settings[key];
   $('#translate-to-value').textContent = languageName(settings.translateTo);
   renderConverterValues();
@@ -1317,7 +1431,9 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && ratesAreStale() && !ratesLoading) updateRates();
+  if (document.visibilityState !== 'visible') return;
+  if (ratesAreStale() && !ratesLoading) updateRates();
+  if (settings.homeChosen && Date.now() - lastDetect > 30 * 60 * 1000) detectSource();
 });
 window.addEventListener('online', () => {
   if (ratesFailed || ratesAreStale()) updateRates();
@@ -1328,6 +1444,10 @@ window.addEventListener('online', () => {
 saveSettings();
 renderAll();
 if (ratesAreStale()) updateRates();
+
+// First launch: ask for the home currency (then "prices in" follows the location).
+if (!settings.homeChosen) setTimeout(openHomeChooser, 300);
+else detectSource();
 
 $('#app-version').textContent = APP_VERSION;
 if (isStandalone()) save('installed', true);

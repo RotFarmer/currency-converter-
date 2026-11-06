@@ -158,10 +158,28 @@ ZMW Zambian Kwacha
 ZWG Zimbabwe Gold
 `;
 
-const EUROZONE = new Set(
-  'AD AT BE BG CY DE EE ES FI FR GR HR IE IT LT LU LV MC ME MT NL PT SI SK SM VA XK'.split(' ')
-);
-const REGION_OVERRIDES = { EC: 'USD', SV: 'USD', PR: 'USD', PA: 'USD', LI: 'CHF', TL: 'USD', ZW: 'USD' };
+// Countries and territories that use another country's currency (or a shared one).
+const SHARED_CURRENCIES = {
+  EUR: 'AD AT AX BE BG BL CY DE EE ES FI FR GF GP GR HR IE IT LT LU LV MC ME MF MQ MT NL PM PT RE SI SK SM VA XK YT',
+  USD: 'AS BQ EC FM GU IO MH MP PA PR PW SV TC TL UM VG VI ZW',
+  AUD: 'CC CX HM KI NF NR TV',
+  NZD: 'CK NU PN TK',
+  GBP: 'GG GS IM JE',
+  DKK: 'FO GL',
+  NOK: 'BV SJ',
+  CHF: 'LI',
+  ILS: 'PS',
+  MAD: 'EH',
+  XCG: 'CW SX',
+  XAF: 'CF CG CM GA GQ TD',
+  XOF: 'BF BJ CI GW ML NE SN TG',
+  XCD: 'AG AI DM GD KN LC MS VC',
+  XPF: 'NC PF WF',
+};
+const REGION_CURRENCY = new Map();
+for (const [code, regions] of Object.entries(SHARED_CURRENCIES)) {
+  for (const region of regions.split(' ')) REGION_CURRENCY.set(region, code);
+}
 
 let regionNames = null;
 try {
@@ -241,6 +259,22 @@ export function searchCurrencies(query, list = CURRENCIES) {
   return matches.sort((a, b) => rank(a) - rank(b));
 }
 
+/** The currency used in a country (ISO 3166 code such as "JP"), or null if unknown. */
+export function currencyForRegion(region) {
+  if (!region) return null;
+  const code = String(region).toUpperCase();
+  if (REGION_CURRENCY.has(code)) return REGION_CURRENCY.get(code);
+  return CURRENCIES.find((c) => c.code.startsWith(code))?.code || null;
+}
+
+export function regionName(region) {
+  try {
+    return regionNames?.of(region) || region;
+  } catch {
+    return region;
+  }
+}
+
 /** Guess the user's home currency from the phone's language/region settings. */
 export function guessHomeCurrency() {
   const langs = (typeof navigator !== 'undefined' && navigator.languages) || ['en-US'];
@@ -252,10 +286,8 @@ export function guessHomeCurrency() {
       region = (lang.split('-')[1] || '').toUpperCase();
     }
     if (!region) continue;
-    if (EUROZONE.has(region)) return 'EUR';
-    if (REGION_OVERRIDES[region]) return REGION_OVERRIDES[region];
-    const match = CURRENCIES.find((c) => c.code.startsWith(region));
-    if (match) return match.code;
+    const match = currencyForRegion(region);
+    if (match) return match;
   }
   return 'USD';
 }

@@ -59,15 +59,14 @@
       <!-- Convert -->
       <section class="view" data-view="convert" aria-labelledby="view-title">
         <div class="panel welcome" id="welcome" hidden>
-          <p>Default currency set to <strong data-chip-text="home">USD</strong>. Everything you type or scan is
-            converted to it. Tap it below to change.</p>
-          <button type="button" class="btn btn-small btn-primary" id="welcome-ok">Got it</button>
+          <p>Choose your <strong>home currency</strong>. Everything you type or scan is converted to it.</p>
+          <button type="button" class="btn btn-small btn-primary" id="welcome-choose">Choose home currency</button>
         </div>
 
         <div class="panel converter">
           <div class="panel-head"><span>Conversion</span><span class="rate-line" id="rate-line"></span></div>
           <div class="money-field">
-            <label class="field-label" for="amount-source">Price in</label>
+            <label class="field-label" for="amount-source">Price in <span class="badge" id="source-badge" hidden>Local</span></label>
             <div class="field-row">
               <button type="button" class="currency-chip" data-pick="source" data-chip="source"></button>
               <div class="amount-wrap">
@@ -115,8 +114,10 @@
         </div>
 
         <div class="panel">
-          <div class="panel-head"><span>Quick reference</span></div>
-          <div id="reference"></div>
+          <div class="panel-head"><span>Quick reference</span><span id="ref-hint"></span></div>
+          <div class="ref-tabs" id="ref-tabs" role="tablist" aria-label="Convert to" hidden></div>
+          <div class="ref-track" id="reference"></div>
+          <div class="ref-dots" id="ref-dots" aria-hidden="true"></div>
         </div>
       </section>
 
@@ -214,10 +215,15 @@
           </button>
           <button type="button" class="list-row" data-pick="source">
             <span class="row-text"><span class="row-label">Prices in</span>
-              <span class="row-hint">The local currency where you are</span></span>
+              <span class="row-hint" id="source-hint">The local currency where you are</span></span>
             <span class="row-value" data-chip="source"></span>
             <svg class="row-chevron"><use href="#i-chevron"/></svg>
           </button>
+          <label class="list-row">
+            <span class="row-text"><span class="row-label">Detect from my location</span>
+              <span class="row-hint">Keeps “Prices in” set to the currency where you are</span></span>
+            <input type="checkbox" class="switch" id="auto-source-toggle" role="switch">
+          </label>
           <label class="list-row">
             <span class="row-text"><span class="row-label">Detect currency signs</span>
               <span class="row-hint">Use €, £, ¥, $, 円, ₪ and codes like USD found in photos</span></span>
@@ -269,6 +275,8 @@
           Rates: <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">ExchangeRate-API</a>,
           updated daily, mid-market (banks and card providers may add fees).
           Text is read on your phone with Tesseract.js and photos are never uploaded.
+          Location: your phone’s time zone, or GPS if you allow it (the country is looked up by
+          BigDataCloud from a position rounded to about 1 km).
           Translation: on-device where the browser supports it, otherwise
           <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>
           (free, about 5,000 characters a day).
