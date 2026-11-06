@@ -90,21 +90,49 @@ async function translateOnline(texts, from, to) {
 }
 
 async function requestTranslation(text, from, to) {
-  const url = `${MYMEMORY_URL}?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(`${serviceCode(from)}|${serviceCode(to)}`)}`;
+  const url = `${MYMEMORY_URL}?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(`${serviceCode(from)}|${serviceCode(to)}`)}&mt=1`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const response = await fetch(url, { signal: controller.signal });
     const json = await response.json();
-    const result = json?.responseData?.translatedText;
-    if (Number(json?.responseStatus) !== 200 || !result) {
+    const fallback = json?.responseData?.translatedText;
+    if (Number(json?.responseStatus) !== 200 || !fallback) {
       throw new Error(json?.responseDetails || `Translation failed (${json?.responseStatus || response.status})`);
     }
-    if (/MYMEMORY WARNING|QUOTA/i.test(result)) throw new Error('Daily free translation limit reached. Try again tomorrow.');
-    return decodeEntities(result);
+    if (/MYMEMORY WARNING|QUOTA/i.test(fallback)) throw new Error('Daily free translation limit reached. Try again tomorrow.');
+    return decodeEntities(pickTranslation(text, json) || fallback);
   } finally {
     clearTimeout(timer);
   }
+}
+
+const comparable = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/**
+ * MyMemory mixes human translation memory with machine translation. Its "best" answer is
+ * sometimes a stored translation of a merely *similar* phrase, which reads as nonsense. Use a
+ * stored translation only when it is for exactly this text; otherwise use the machine translation.
+ */
+export function pickTranslation(text, json) {
+  const matches = Array.isArray(json?.matches) ? json.matches : [];
+  const wanted = comparable(text);
+  const exact = matches
+    .filter((m) => m.translation && comparable(m.segment) === wanted && !/MT/i.test(m['created-by'] || ''))
+    .sort((a, b) => Number(b.quality || 0) - Number(a.quality || 0))[0];
+  if (exact && Number(exact.quality || 0) >= 50) return exact.translation;
+  const machine = matches.find((m) => m.translation && /MT/i.test(m['created-by'] || ''));
+  if (machine) return machine.translation;
+  const best = json?.responseData;
+  // A fuzzy memory match with nothing better: only trust it if it's a close match.
+  if (best?.translatedText && Number(best.match ?? 1) >= 0.85) return best.translatedText;
+  return null;
+}
+
+/** A link that opens the text in Google Translate (website or app) for a second opinion. */
+export function googleTranslateUrl(text, from, to) {
+  const code = (lang) => (lang === 'zh' ? 'zh-CN' : lang === 'nb' ? 'no' : lang || 'auto');
+  return `https://translate.google.com/?sl=${encodeURIComponent(code(from))}&tl=${encodeURIComponent(code(to))}&text=${encodeURIComponent(text)}&op=translate`;
 }
 
 function decodeEntities(text) {

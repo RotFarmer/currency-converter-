@@ -109,11 +109,17 @@ export function languageFromScript(model, text) {
   }
 }
 
-/** The OCR model that reads a language best (Latin-alphabet languages use the English model). */
+/**
+ * The OCR model that reads a language best. Latin-alphabet languages have their own models too:
+ * they know the accents (à, ñ, ő, ă…) and common words, which the English model mangles.
+ */
 export function modelForLanguage(lang) {
   const map = {
     ja: 'jpn', zh: 'chi_sim', 'zh-TW': 'chi_tra', ko: 'kor', th: 'tha', he: 'heb', ar: 'ara', fa: 'ara', ur: 'ara',
     ru: 'rus', uk: 'rus', sr: 'rus', kk: 'rus', el: 'ell', hi: 'hin',
+    fr: 'fra', es: 'spa', de: 'deu', it: 'ita', pt: 'por', nl: 'nld', sv: 'swe', nb: 'nor', da: 'dan', fi: 'fin',
+    pl: 'pol', cs: 'ces', sk: 'slk', sl: 'slv', hu: 'hun', ro: 'ron', hr: 'hrv', tr: 'tur', vi: 'vie', id: 'ind',
+    ms: 'msa', tl: 'tgl', is: 'isl',
   };
   return map[lang] || 'eng';
 }

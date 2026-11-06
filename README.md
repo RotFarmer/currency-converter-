@@ -5,7 +5,8 @@ A currency converter for your phone, with a dark, minimal mech-HUD look. Set a d
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
 - **Quick reference tabs.** A ready-made table of common amounts, with a tab per currency (home plus your extras). Swipe left/right or tap a tab to switch.
-- **Up to 10 other currencies.** Tap ☰ **Other currencies** between the two amounts to open a drawer with your extra currencies. Tap **+** to add one (up to 10) and **×** to remove one; whatever you type is shown in each of them.
+- **Up to 10 other currencies.** Tap ☰ **Other currencies** between the two amounts to open a drawer with your extra currencies. Tap **+** to add one (up to 10) and **×** to remove one.
+- **Type in any currency.** Every amount, including those in the ☰ drawer, can be typed into; all the others update. 0 in any of them makes them all 0.
 - **Live camera.** Point the in-app camera at price tags or a menu and converted prices appear on screen as you move. Tap the shutter for a full scan with translation.
 - **Scan photos.** Take a photo (or pick one) of a price tag, menu or receipt. Each price is found and covered with its converted amount, right on the photo. Tap a price to fix a misread number or change its currency.
 - **Translates what it reads.** Menu items and signs are translated into your language. The **Text** view lays the translations over the photo, each price in the list shows its translated item name, and a list of every line is shown below the photo.
@@ -35,6 +36,14 @@ Settings → Language has switches for translation and for guessing the currency
 ## Translation
 
 Translation runs on the phone where the browser offers a built-in translator (recent desktop Chrome). Otherwise it uses [MyMemory](https://mymemory.translated.net)'s free API, which needs no account. It allows roughly 5,000 characters a day per device, about a dozen menus. Past that, translation pauses until the next day; prices and currency detection keep working.
+
+To get good translations the app:
+- re-reads the photo with the text model for the detected language (French, Spanish, German, Japanese, Thai… about 40 languages), so accents and characters come out right;
+- drops lines the text reader wasn't sure about, dot leaders and stray marks;
+- translates item names printed over two lines as one phrase;
+- only accepts MyMemory's stored human translations when they are for exactly that text, and otherwise uses its machine translation (its "fuzzy" matches for similar phrases are a common source of nonsense).
+
+For a second opinion, **Open in Google Translate** sends the photo's text to Google Translate's website or app.
 
 ## Hosting it
 

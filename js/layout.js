@@ -18,14 +18,27 @@ function unionBox(boxes) {
  * Text lines with the prices taken out, e.g. "Menu du jour 14,90" → "Menu du jour".
  * Lines without at least two letters, or that the model was unsure about, are dropped.
  */
+// Stray marks OCR picks up from borders, dots and dashes on menus.
+const NOISE_EDGES = /^[\s|_~•·.,:;'"`´^*=+\-–—…<>()[\]{}/\\]+|[\s|_~•·,:;'"`´^*=+\-–—…<>([{/\\]+$/gu;
+
 export function textLines(lines, priceBoxes) {
   const result = [];
   for (const line of lines) {
-    const words = line.words.filter((w) => w.text.trim() && !priceBoxes.some((box) => centerInside(w, box)));
-    const text = words.map((w) => w.text).join(isSpaceless(words) ? '' : ' ').trim();
+    // Drop prices and words the model was clearly guessing at.
+    const words = line.words.filter(
+      (w) => w.text.trim() && w.confidence >= 35 && !priceBoxes.some((box) => centerInside(w, box))
+    );
+    const text = words
+      .map((w) => w.text)
+      .join(isSpaceless(words) ? '' : ' ')
+      .replace(/\.{3,}|…+/g, ' ') // dot leaders between a dish and its price
+      .replace(NOISE_EDGES, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
     const letters = (text.match(/\p{L}/gu) || []).length;
     const confidence = words.length ? words.reduce((sum, w) => sum + w.confidence, 0) / words.length : 0;
-    if (letters < 2 || confidence < 45) continue;
+    // Mostly symbols, or low confidence overall: probably not real text.
+    if (letters < 2 || letters / text.replace(/\s/g, '').length < 0.5 || confidence < 55) continue;
     const base = line.baseline;
     const slope = base && base.x1 - base.x0 > 0 ? (base.y1 - base.y0) / (base.x1 - base.x0) : null;
     result.push({ text, bbox: unionBox(words.map((w) => w.bbox)), slope });

@@ -18,10 +18,10 @@ import { cameraSupported, startCamera, stopCamera, torchSupported, setTorch, gra
 import { readPrices, identifyLanguage, readInLanguage, mergePrices } from './scan.js';
 import { textLines, labelFor } from './layout.js';
 import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
-import { translateLines } from './translate.js';
+import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v7'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v8'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -314,7 +314,28 @@ document.addEventListener('click', (event) => {
 /* ---------- Converter ---------- */
 
 const inputs = { source: $('#amount-source'), home: $('#amount-home') };
-const converter = { side: 'source', value: null }; // the side the user last typed in
+// One amount drives every field. `field` is the one last typed in: "source", "home" or
+// "extra:GBP" for a row in the ☰ drawer. Every other field shows the amount converted.
+const converter = { field: 'source', value: null };
+
+function fieldCurrency(field) {
+  return field === 'source' || field === 'home' ? settings[field] : field.slice(6);
+}
+
+/** The current amount in a currency, or null if nothing has been typed. */
+function amountIn(code) {
+  if (converter.value == null) return null;
+  return convert(converter.value, fieldCurrency(converter.field), code);
+}
+
+/** Start from an amount in a given field, e.g. after tapping a quick-reference row. */
+function setAmount(field, value) {
+  converter.field = field;
+  converter.value = value;
+  const input = field === 'source' || field === 'home' ? inputs[field] : $(`.extra-input[data-extra="${field.slice(6)}"]`);
+  if (input) input.value = formatInputNumber(value, fieldCurrency(field));
+  renderConverterValues();
+}
 
 function fitInput(input) {
   const length = input.value.length;
@@ -322,54 +343,66 @@ function fitInput(input) {
 }
 
 function renderConverterValues() {
-  const { side, value } = converter;
-  const other = side === 'source' ? 'home' : 'source';
-  const result = value == null ? null : convert(value, settings[side], settings[other]);
-  inputs[other].value = formatInputNumber(result, settings[other]);
   for (const [name, input] of Object.entries(inputs)) {
+    // Leave the field being typed in alone, so the cursor and what was typed stay put.
+    if (converter.field !== name) input.value = formatInputNumber(amountIn(settings[name]), settings[name]);
     fitInput(input);
     $('[data-clear]', input.parentElement).hidden = input.value === '';
     input.setAttribute('aria-label', `Amount in ${settings[name]}`);
   }
-  renderExtraCurrencies();
+  updateExtraValues();
 }
 
 const MAX_EXTRA = 10;
-
-/** The amount typed, in the "price in" currency (or null if nothing is typed). */
-function sourceAmount() {
-  if (converter.value == null) return null;
-  return converter.side === 'source' ? converter.value : convert(converter.value, settings.home, settings.source);
-}
+let renderedExtraKey = '';
 
 function renderExtraCurrencies() {
-  const { source } = settings;
   const count = settings.extra.length;
   $('#extra-count').textContent = String(count);
   $('#extra-menu').setAttribute('aria-expanded', String(settings.extraOpen));
   $('#extra-menu').setAttribute('aria-label', `Other currencies, ${count} added. ${settings.extraOpen ? 'Hide' : 'Show'}`);
   $('#extra').hidden = !settings.extraOpen;
-  if (!settings.extraOpen) return;
   $('#extra-limit').textContent = `${count}/${MAX_EXTRA}`;
   $('#extra-add').hidden = count >= MAX_EXTRA;
-  const amount = sourceAmount() ?? 0;
-  $('#extra-basis').textContent = `For ${formatMoney(amount, source)}`;
-  $('#extra-list').innerHTML = count
-    ? settings.extra
-        .map((code) => {
-          const currency = getCurrency(code);
-          const glyph = symbolGlyph(currency);
-          return `<div class="extra-row">
-            <span class="sym${glyph.length > 2 ? ' long' : ''}" aria-hidden="true">${escapeHtml(glyph)}</span>
-            <span class="code">${code}</span>
-            <span class="name">${escapeHtml(currency.name)}</span>
-            <span class="val">${escapeHtml(formatMoney(convert(amount, source, code), code))}</span>
-            <button type="button" class="row-remove" data-remove="${code}" aria-label="Remove ${code}"><svg><use href="#i-close"/></svg></button>
-          </div>`;
-        })
-        .join('')
-    : '<p class="empty-note">Tap + to add up to 10 currencies.</p>';
+  // Only rebuild the rows when the list changes, so typing in one isn't interrupted.
+  const key = `${settings.extraOpen}|${settings.extra.join(',')}`;
+  if (key !== renderedExtraKey) {
+    renderedExtraKey = key;
+    $('#extra-list').innerHTML = count
+      ? settings.extra
+          .map((code) => {
+            const currency = getCurrency(code);
+            const glyph = symbolGlyph(currency);
+            return `<div class="extra-row">
+              <span class="sym${glyph.length > 2 ? ' long' : ''}" aria-hidden="true">${escapeHtml(glyph)}</span>
+              <span class="code">${code}</span>
+              <span class="name">${escapeHtml(currency.name)}</span>
+              <input class="extra-input" data-extra="${code}" inputmode="decimal" autocomplete="off" enterkeyhint="done"
+                     placeholder="0" aria-label="Amount in ${code}">
+              <button type="button" class="row-remove" data-remove="${code}" aria-label="Remove ${code}"><svg><use href="#i-close"/></svg></button>
+            </div>`;
+          })
+          .join('')
+      : '<p class="empty-note">Tap + to add up to 10 currencies.</p>';
+  }
+  updateExtraValues();
 }
+
+function updateExtraValues() {
+  for (const input of $$('.extra-input')) {
+    const code = input.dataset.extra;
+    if (converter.field === `extra:${code}` && document.activeElement === input) continue;
+    input.value = formatInputNumber(amountIn(code), code);
+  }
+}
+
+$('#extra-list').addEventListener('input', (event) => {
+  const input = event.target.closest('.extra-input');
+  if (!input) return;
+  converter.field = `extra:${input.dataset.extra}`;
+  converter.value = parseUserNumber(input.value);
+  renderConverterValues();
+});
 
 function saveExtra() {
   saveSettings();
@@ -399,8 +432,15 @@ $('#extra-add').addEventListener('click', () => {
 $('#extra-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-remove]');
   if (!button) return;
-  settings.extra = settings.extra.filter((code) => code !== button.dataset.remove);
+  const code = button.dataset.remove;
+  if (converter.field === `extra:${code}`) {
+    // The amount was typed in this row: keep it, now held in the "price in" field.
+    converter.value = amountIn(settings.source);
+    converter.field = 'source';
+  }
+  settings.extra = settings.extra.filter((c) => c !== code);
   saveExtra();
+  renderConverterValues();
 });
 
 function renderRateLine() {
@@ -502,7 +542,7 @@ refTabs.addEventListener('click', (event) => {
 
 for (const input of Object.values(inputs)) {
   input.addEventListener('input', () => {
-    converter.side = input.dataset.side;
+    converter.field = input.dataset.side;
     converter.value = parseUserNumber(input.value);
     renderConverterValues();
   });
@@ -511,10 +551,7 @@ for (const input of Object.values(inputs)) {
 $('#reference').addEventListener('click', (event) => {
   const row = event.target.closest('[data-amount]');
   if (!row) return;
-  converter.side = 'source';
-  converter.value = Number(row.dataset.amount);
-  inputs.source.value = formatInputNumber(converter.value, settings.source);
-  renderConverterValues();
+  setAmount('source', Number(row.dataset.amount));
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -534,7 +571,8 @@ const scan = {
   englishPrices: [],
   items: [],
   edited: false, // the user changed a price, so later passes must not replace the list
-  lines: [], // text lines (prices removed) used for item names and translation
+  lines: [], // text lines (prices removed) used for item names
+  groups: [], // pieces of text to translate (multi-line item names kept together)
   language: null,
   langRun: 0,
   langStatus: 'idle', // idle | detecting | done | none | failed
@@ -643,15 +681,45 @@ function setItems(prices) {
 function assignLabels() {
   const rtl = isRtl(scan.language);
   for (const item of scan.items) {
-    item.labelLines = labelFor(item.bbox, scan.lines, { rtl }).map((line) => line.text);
+    const lines = labelFor(item.bbox, scan.lines, { rtl });
+    item.labelLines = lines.map((line) => line.text);
     item.label = item.labelLines.join(' ') || null;
+    item.labelBox = lines.length ? unionBox(lines.map((line) => line.bbox)) : null;
   }
+  scan.groups = textGroups();
+}
+
+function unionBox(boxes) {
+  return {
+    x0: Math.min(...boxes.map((b) => b.x0)),
+    y0: Math.min(...boxes.map((b) => b.y0)),
+    x1: Math.max(...boxes.map((b) => b.x1)),
+    y1: Math.max(...boxes.map((b) => b.y1)),
+  };
+}
+
+/**
+ * The pieces of text to translate. An item name printed over two lines ("Croissant" /
+ * "au beurre") is translated as one phrase, which reads far better than two fragments.
+ */
+function textGroups() {
+  const groups = [];
+  const inLabel = new Set();
+  for (const item of scan.items) {
+    if (item.labelLines.length < 2 || groups.some((g) => g.text === item.label)) continue;
+    item.labelLines.forEach((text) => inLabel.add(text));
+    groups.push({ text: item.label, bbox: item.labelBox, lineCount: item.labelLines.length });
+  }
+  for (const line of scan.lines) {
+    if (!inLabel.has(line.text)) groups.push({ text: line.text, bbox: line.bbox, lineCount: 1 });
+  }
+  return groups.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
 }
 
 /** An item's name in the translation language, or null if there is no translation. */
 function translatedLabel(item) {
-  if (!scan.translations || !item.labelLines?.length) return null;
-  return item.labelLines.map((text) => scan.translations.get(text) || text).join(' ');
+  if (!scan.translations || !item.label) return null;
+  return scan.translations.get(item.label) || item.labelLines.map((text) => scan.translations.get(text) || text).join(' ');
 }
 
 async function handlePhoto(file) {
@@ -685,6 +753,7 @@ async function recognise(run) {
     englishLines: [],
     englishPrices: [],
     lines: [],
+    groups: [],
     edited: false,
     language: null,
     langStatus: 'idle',
@@ -772,13 +841,13 @@ async function translateScan(live = () => true) {
   const to = settings.translateTo;
   scan.translations = null;
   if (!settings.translate) scan.translateStatus = 'off';
-  else if (!from || !scan.lines.length) scan.translateStatus = 'idle';
+  else if (!from || !scan.groups.length) scan.translateStatus = 'idle';
   else if (baseLanguage(from) === baseLanguage(to)) scan.translateStatus = 'same';
   else scan.translateStatus = 'busy';
   renderScan();
   if (scan.translateStatus !== 'busy') return;
   try {
-    const texts = scan.lines.map((line) => line.text);
+    const texts = scan.groups.map((group) => group.text);
     const translated = await translateLines(texts, from, to);
     if (!live()) return;
     scan.translations = new Map(texts.map((text, i) => [text, translated[i]]));
@@ -843,6 +912,9 @@ function renderLanguageBar() {
   else if (scan.translateStatus === 'failed') [text, state] = [`Translation failed: ${scan.translateError}`, 'error'];
   status.textContent = text;
   status.className = `lang-status${state ? ` ${state}` : ''}`;
+  const offerGoogle = ['failed', 'off'].includes(scan.translateStatus) && scan.language && scan.groups.length;
+  $('#lang-google').hidden = !offerGoogle;
+  if (offerGoogle) $('#lang-google').href = googleLink();
 }
 
 function renderOverlays() {
@@ -854,7 +926,7 @@ function renderOverlays() {
     return;
   }
   const rtl = isRtl(scan.language);
-  const obstacles = [...scan.lines.map((l) => l.bbox), ...scan.items.map((i) => i.bbox)];
+  const obstacles = [...scan.groups.map((g) => g.bbox), ...scan.items.map((i) => i.bbox)];
   // Translations are usually longer than the original (English vs Japanese), so each one may
   // grow into the empty space beside its line, up to the next text or price on the same row.
   const room = (box) => {
@@ -869,17 +941,20 @@ function renderOverlays() {
   };
   const textTags = !scan.translations
     ? []
-    : scan.lines.map((line) => {
-        const translated = scan.translations.get(line.text);
+    : scan.groups.map((group) => {
+        const translated = scan.translations.get(group.text);
         if (!translated) return '';
-        const { x0, y0, x1, y1 } = line.bbox;
+        const { x0, y0, x1, y1 } = group.bbox;
         const h = y1 - y0;
-        const pad = h * 0.12;
-        const avail = room(line.bbox);
+        const lineH = h / group.lineCount;
+        const pad = lineH * 0.12;
+        const avail = room(group.bbox);
         // Font size in photo pixels; the monospace font is ~0.6em per character, plus padding.
-        const fs = Math.min(h * 0.85, avail / ((translated.length + 1) * 0.6));
+        // A name spread over several lines may wrap over the same number of lines.
+        const fs = Math.min(lineH * 0.85, (avail * group.lineCount) / ((translated.length + 1) * 0.6));
         const side = rtl ? `right:${pct(W - x1, W)}` : `left:${pct(x0, W)}`;
-        return `<div class="text-tag${rtl ? ' rtl' : ''}" dir="auto" style="${side};top:${pct(y0 - pad, H)};height:${pct(h + pad * 2, H)};min-width:${pct(x1 - x0, W)};max-width:${pct(avail, W)};--fs:${fs.toFixed(1)}">${escapeHtml(translated)}</div>`;
+        const cls = `text-tag${rtl ? ' rtl' : ''}${group.lineCount > 1 ? ' multi' : ''}`;
+        return `<div class="${cls}" dir="auto" style="${side};top:${pct(y0 - pad, H)};height:${pct(h + pad * 2, H)};min-width:${pct(x1 - x0, W)};max-width:${pct(avail, W)};--fs:${fs.toFixed(1)}">${escapeHtml(translated)}</div>`;
       });
   const priceTags = scan.items.map((item) => {
     const { x0, y0, x1, y1 } = item.bbox;
@@ -959,20 +1034,26 @@ function renderSummary() {
   el.innerHTML = `<div class="panel-head"><span>${count} price${count === 1 ? '' : 's'} found</span><span>Tap to fix</span></div>${rows.join('')}`;
 }
 
+/** All the photo's text, for opening in Google Translate. */
+function googleLink() {
+  return googleTranslateUrl(scan.groups.map((g) => g.text).join('\n'), scan.language, settings.translateTo);
+}
+
 function renderTranslationCard() {
   const card = $('#translation-card');
-  const entries = scan.translations ? scan.lines.filter((line) => scan.translations.get(line.text)) : [];
+  const entries = scan.translations ? scan.groups.filter((group) => scan.translations.get(group.text)) : [];
   card.hidden = !entries.length;
   if (card.hidden) {
     $('#translation-list').innerHTML = '';
     return;
   }
   $('#translation-pair').textContent = `${scan.language.toUpperCase()} → ${settings.translateTo.toUpperCase()}`;
+  $('#google-translate').href = googleLink();
   $('#translation-list').innerHTML = entries
     .map(
-      (line) => `<div class="translation-row">
-        <span class="orig" dir="auto">${escapeHtml(line.text)}</span>
-        <span class="tr" dir="auto">${escapeHtml(scan.translations.get(line.text))}</span>
+      (group) => `<div class="translation-row">
+        <span class="orig" dir="auto">${escapeHtml(group.text)}</span>
+        <span class="tr" dir="auto">${escapeHtml(scan.translations.get(group.text))}</span>
       </div>`
     )
     .join('');
@@ -1222,12 +1303,10 @@ $('#price-remove').addEventListener('click', () => {
 
 $('#price-open').addEventListener('click', () => {
   const currency = currencyOf(editing);
-  converter.side = 'source';
-  converter.value = editing.amount;
+  const amount = editing.amount;
   closeSheet(priceSheet);
   setCurrency('source', currency);
-  inputs.source.value = formatInputNumber(editing.amount, currency);
-  renderConverterValues();
+  setAmount('source', amount);
   showTab('convert');
 });
 
@@ -1382,6 +1461,7 @@ function renderAll() {
       : 'Detecting where you are…';
   for (const [selector, key] of Object.entries(toggles)) $(selector).checked = settings[key];
   $('#translate-to-value').textContent = languageName(settings.translateTo);
+  renderExtraCurrencies();
   renderConverterValues();
   renderRateLine();
   renderReference();
@@ -1427,7 +1507,7 @@ document.addEventListener('click', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && openSheets.length) closeSheet(openSheets.at(-1));
-  if (event.key === 'Enter' && event.target.matches('.amount-input')) event.target.blur();
+  if (event.key === 'Enter' && event.target.matches('.amount-input, .extra-input')) event.target.blur();
 });
 
 document.addEventListener('visibilitychange', () => {

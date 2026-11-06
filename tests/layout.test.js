@@ -16,6 +16,14 @@ test('textLines drops prices and low-quality lines', () => {
   assert.deepEqual(result[0].bbox, box(0, 0, 95, 10));
 });
 
+test('textLines cleans up dot leaders and stray marks', () => {
+  const lines = [
+    { words: [word('|', box(0, 0, 5, 10)), word('Espresso', box(10, 0, 80, 10)), word('.........', box(85, 0, 200, 10)), word('2,50', box(300, 0, 340, 10))] },
+    { words: [word('~~', box(0, 20, 20, 30)), word('—', box(25, 20, 40, 30))] },
+  ];
+  assert.deepEqual(textLines(lines, [box(295, -2, 345, 12)]).map((l) => l.text), ['Espresso']);
+});
+
 test('labelFor picks the name on the same row', () => {
   const lines = [
     { text: 'Coffee', bbox: box(0, 0, 60, 12) },

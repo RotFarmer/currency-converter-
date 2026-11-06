@@ -62,7 +62,15 @@ export async function identifyLanguage(canvas, englishLines, { hintCurrencies = 
     const text = englishLines.map((line) => line.text).join('\n');
     const lang = (await detectLanguageOnDevice(text)) || detectLatinLanguage(text);
     const words = englishLines.flatMap((line) => line.words).filter((w) => /\p{L}{2}/u.test(w.text)).length;
-    if (lang || words < 3) return { lang, model: 'eng', lines: englishLines };
+    if (lang) {
+      // Read it again with that language's own model: accents and words come out right,
+      // which makes a big difference to the translation.
+      const model = modelForLanguage(lang);
+      const lines = model === 'eng' || isCancelled() ? null : await readWith(canvas, model);
+      releaseWorkers(lines ? [model] : []);
+      return lines ? { lang, model, lines } : { lang, model: 'eng', lines: englishLines };
+    }
+    if (words < 3) return unknown;
     // Cyrillic and Greek letters look like Latin ones, so the English model reads them with
     // fair confidence as nonsense words. Text in no known language gets a quick check for those,
     // and only a clear match counts.
