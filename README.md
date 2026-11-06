@@ -4,7 +4,7 @@ A currency converter for your phone, with a dark, minimal mech-HUD look. Set a d
 
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
-- **Quick reference tabs.** A ready-made table of common amounts, with a tab per currency (home plus your extras). Swipe left/right or tap a tab to switch.
+- **Quick reference tabs.** Ready-made tables of common amounts, always shown in your home currency: one tab for your "Price in" currency and one for each currency in the ☰ drawer. Swipe left/right or tap a tab to switch; tap a row to put that amount in the converter.
 - **Up to 10 other currencies.** Tap ☰ **Other currencies** between the two amounts to open a drawer with your extra currencies. Tap **+** to add one (up to 10) and **×** to remove one.
 - **Type in any currency.** Every amount, including those in the ☰ drawer, can be typed into; all the others update. 0 in any of them makes them all 0.
 - **Live camera.** Point the in-app camera at price tags or a menu and converted prices appear on screen as you move. Tap the shutter for a full scan with translation.

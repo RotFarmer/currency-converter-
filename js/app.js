@@ -21,7 +21,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v8'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v9'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -456,26 +456,28 @@ function renderRateLine() {
   el.textContent = `${units.toLocaleString()} ${source} = ${formatRate(rate * units)} ${home}`;
 }
 
-// Quick reference: one swipeable page per currency (home first, then the ☰ extras).
+// Quick reference: every table is in your home currency. One swipeable page per other
+// currency: "price in" first, then the ☰ extras.
 const refTrack = $('#reference');
 const refTabs = $('#ref-tabs');
 let refActive = null; // currency of the page on screen
 
 function referenceTargets() {
-  return [settings.home, ...settings.extra].filter((code, i, all) => code !== settings.source && all.indexOf(code) === i);
+  return [settings.source, ...settings.extra].filter((code, i, all) => code !== settings.home && all.indexOf(code) === i);
 }
 
-function referenceTable(target) {
-  const { source } = settings;
-  const targetInSource = convert(1, target, source);
-  const base = 10 ** Math.max(0, Math.floor(Math.log10(targetInSource)));
+/** Round amounts in a currency (1, 2, 5, 10 … scaled to its value) and what each is at home. */
+function referenceTable(code) {
+  const { home } = settings;
+  const homeInCode = convert(1, home, code);
+  const base = 10 ** Math.max(0, Math.floor(Math.log10(homeInCode)));
   const rows = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000].map((step) => {
     const amount = step * base;
-    return `<button type="button" class="ref-row" data-amount="${amount}">
-      <span>${formatMoney(amount, source)}</span><span>${formatMoney(convert(amount, source, target), target)}</span>
+    return `<button type="button" class="ref-row" data-amount="${amount}" data-currency="${code}">
+      <span>${formatMoney(amount, code)}</span><span>${formatMoney(convert(amount, code, home), home)}</span>
     </button>`;
   });
-  return `<div class="ref-head"><span>${source}</span><span>${target}</span></div>${rows.join('')}`;
+  return `<div class="ref-head"><span>${code}</span><span>${home}</span></div>${rows.join('')}`;
 }
 
 function renderReference() {
@@ -490,7 +492,8 @@ function renderReference() {
     return;
   }
   if (!targets.length) {
-    refTrack.innerHTML = '<p class="empty-note">Pick a different “Price in” currency to see a conversion table.</p>';
+    refTabs.hidden = true;
+    refTrack.innerHTML = '<p class="empty-note">Set “Price in” to another currency, or add some with ☰, to see a table.</p>';
     return;
   }
   if (!targets.includes(refActive)) refActive = targets[0];
@@ -502,7 +505,7 @@ function renderReference() {
     })
     .join('');
   refTrack.innerHTML = targets
-    .map((code) => `<div class="ref-page" role="tabpanel" data-ref-page="${code}" aria-label="${source} to ${code}">${referenceTable(code)}</div>`)
+    .map((code) => `<div class="ref-page" role="tabpanel" data-ref-page="${code}" aria-label="${code} to ${home}">${referenceTable(code)}</div>`)
     .join('');
   if (targets.length > 1) $('#ref-dots').innerHTML = targets.map((code) => `<span class="ref-dot${code === refActive ? ' active' : ''}"></span>`).join('');
   // Keep showing the same currency after a re-render.
@@ -551,7 +554,9 @@ for (const input of Object.values(inputs)) {
 $('#reference').addEventListener('click', (event) => {
   const row = event.target.closest('[data-amount]');
   if (!row) return;
-  setAmount('source', Number(row.dataset.amount));
+  // Put the amount in the field for that currency: "price in", or its row in the ☰ drawer.
+  const code = row.dataset.currency;
+  setAmount(code === settings.source ? 'source' : `extra:${code}`, Number(row.dataset.amount));
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
