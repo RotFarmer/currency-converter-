@@ -1,0 +1,105 @@
+# Builds the Android app (android-app/) and publishes the APK as the "android-latest" release,
+# so the newest version is always at the same link:
+# https://github.com/RotFarmer/currency-converter-/releases/download/android-latest/Converter.apk
+name: Android app
+
+on:
+  push:
+    branches: [ccr-cd03111f-2zsg3c]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: android-app/package-lock.json
+
+      - name: Install Capacitor
+        working-directory: android-app
+        run: npm ci
+
+      - name: Sync web assets and plugins into the Android project
+        working-directory: android-app
+        run: npx cap sync android
+
+      # Android installs an update only if it is signed with the same key as the installed app.
+      # With an ANDROID_SIGNING_PASSWORD repository secret, the first build creates a key locked with that
+      # password and saves it (encrypted) in android-app/signing/; later builds reuse it. Without the secret
+      # each build gets a temporary key, so a new APK can only be installed after removing the old app.
+      - name: Signing key
+        id: signing
+        env:
+          SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
+        run: |
+          KEY=android-app/signing/converter-release.p12
+          if [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::warning::No ANDROID_SIGNING_PASSWORD secret: signing with a temporary key."
+            echo "permanent=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ ! -f "$KEY" ]; then
+            mkdir -p android-app/signing
+            keytool -genkeypair -storetype PKCS12 -keystore "$KEY" -alias converter -keyalg RSA -keysize 3072 \
+              -validity 36500 -storepass "$SIGNING_PASSWORD" -keypass "$SIGNING_PASSWORD" -dname "CN=Converter"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$KEY"
+            git commit -m "Add the Android app's signing key (encrypted with the ANDROID_SIGNING_PASSWORD secret)"
+            git pull --rebase origin "${{ github.ref_name }}"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
+          echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/$KEY" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+          echo "permanent=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        working-directory: android-app/android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace -PappVersionCode=${{ github.run_number }}
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PERMANENT_KEY: ${{ steps.signing.outputs.permanent }}
+        run: |
+          cp android-app/android/app/build/outputs/apk/release/app-release.apk Converter.apk
+          NOTES="Open this page on your Android phone, tap **Converter.apk** to download it, then open the file to install. The first time, Android asks you to allow installs from your browser."
+          if [ "$PERMANENT_KEY" = "true" ]; then
+            NOTES="$NOTES Updates install over the old version and keep your settings."
+          else
+            NOTES="$NOTES This build is signed with a temporary key: to install a newer build, remove the old app first."
+          fi
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest Converter.apk \
+            --target "$(git rev-parse HEAD)" \
+            --title "Converter for Android (build ${{ github.run_number }})" \
+            --notes "$NOTES"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Converter-apk
+          path: Converter.apk

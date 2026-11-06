@@ -1,0 +1,18 @@
+{
+  "appId": "io.github.rotfarmer.converter",
+  "appName": "Converter",
+  "webDir": "www",
+  "server": {
+    "url": "https://rotfarmer.github.io/currency-converter-/",
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "backgroundColor": "#040605"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

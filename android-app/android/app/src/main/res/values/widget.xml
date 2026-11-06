@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="widget_radius">18dp</dimen>
+    <string name="widget_name">Converter</string>
+    <string name="widget_title">CONVERTER</string>
+    <string name="widget_description">Your currencies converted to your home currency</string>
+    <string name="widget_setup">Open Converter once to set up the widget.</string>
+    <string name="widget_add_currencies">Choose a “Price in” currency or add some with ☰ in Converter.</string>
+    <string name="widget_refresh">Refresh rates</string>
+</resources>

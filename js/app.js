@@ -22,7 +22,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v15'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v16'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -63,6 +63,78 @@ settings.source ||= settings.home === 'EUR' ? 'USD' : 'EUR';
 
 function saveSettings() {
   save('settings', settings);
+  syncWidget();
+}
+
+/* ---------- Android app: home-screen widget ---------- */
+// Inside the Android app (Capacitor) the widget gets your currencies, an amount for each, the rates and
+// the theme's colours. It redraws itself from these and refreshes the rates on its own.
+
+const isNativeApp = Boolean(window.Capacitor?.isNativePlatform?.());
+let widgetTimer = 0;
+
+function syncWidget() {
+  if (!isNativeApp) return;
+  clearTimeout(widgetTimer);
+  widgetTimer = setTimeout(sendWidgetData, 400);
+}
+
+/** Any CSS colour as #rrggbb (transparency dropped), for Android. */
+function hexColor(value, fallback) {
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.fillStyle = fallback;
+  ctx.fillStyle = value || fallback;
+  const out = ctx.fillStyle;
+  if (out.startsWith('#')) return out;
+  const [r, g, b] = (out.match(/[\d.]+/g) || []).map(Number);
+  return `#${[r, g, b].map((n) => Math.round(n || 0).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** What goes around the number when this currency is written, e.g. "¥" and "", or "CHF " and "". */
+function moneyParts(code) {
+  const sample = formatMoney(1234.5, code);
+  const match = /^(.*?)(\d(?:[\d.,\s\u00a0\u202f]*\d)?)(.*)$/.exec(sample);
+  return match ? { prefix: match[1], suffix: match[3] } : { prefix: '', suffix: ` ${code}` };
+}
+
+/** The amount from the quick reference list that's worth about 10 in the home currency. */
+function widgetAmount(code) {
+  const amounts = referenceAmounts(code).length ? referenceAmounts(code) : suggestedAmounts(code);
+  let best = amounts[Math.min(3, amounts.length - 1)];
+  let bestScore = Infinity;
+  for (const amount of amounts) {
+    const value = convert(amount, code, settings.home);
+    if (!(value > 0)) continue;
+    const score = Math.abs(Math.log10(value / 10));
+    if (score < bestScore) [best, bestScore] = [amount, score];
+  }
+  return best;
+}
+
+function sendWidgetData() {
+  const rates = getRates();
+  const { home } = settings;
+  const codes = referenceTargets().slice(0, 6);
+  const css = getComputedStyle(document.documentElement);
+  const color = (name, fallback) => hexColor(css.getPropertyValue(name).trim(), fallback);
+  const homeParts = moneyParts(home);
+  const data = {
+    home,
+    homePrefix: homeParts.prefix,
+    homeSuffix: homeParts.suffix,
+    homeDecimals: fractionDigits(home),
+    rows: rates ? codes.map((code) => ({ code, amount: widgetAmount(code), decimals: fractionDigits(code), ...moneyParts(code) })) : [],
+    rates: rates ? Object.fromEntries([home, ...codes].filter((code) => rates.rates[code]).map((code) => [code, rates.rates[code]])) : {},
+    ratesUpdatedAt: rates?.updatedAt || 0,
+    colors: {
+      bg: color('--panel', '#040605'),
+      text: color('--text', '#cfe3d3'),
+      dim: color('--text-faint', '#6f8a76'),
+      accent: color('--accent', '#7dff72'),
+      line: color('--line-strong', '#2a5636'),
+    },
+  };
+  window.Capacitor.nativePromise('ConverterWidget', 'update', data).catch(() => {});
 }
 
 function rememberRecent(code) {
@@ -130,6 +202,7 @@ function applyTheme() {
   const barColor = css.getPropertyValue('--theme-color').trim() || css.getPropertyValue('--bg').trim();
   $('meta[name="theme-color"]').setAttribute('content', barColor || '#040605');
   renderAppearanceControls();
+  syncWidget();
 }
 
 function renderAppearanceControls() {
@@ -1602,7 +1675,8 @@ const installSheet = $('#install-sheet');
 const ua = navigator.userAgent;
 const isIos = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isAndroid = /Android/i.test(ua);
-const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+// The Android app is already installed, so it never offers to install the web app.
+const isStandalone = () => isNativeApp || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installPrompt = null;
 
 function installKind() {
@@ -1707,6 +1781,7 @@ function renderAll() {
   renderScan();
   renderPriceSheet();
   renderInstall();
+  syncWidget();
 }
 
 let toastTimer;
