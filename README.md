@@ -17,7 +17,7 @@ A currency converter for your phone. Set a default currency once, and every pric
   - **8-bit**: pixel fonts, chunky pixel borders, a starfield. Dark only.
   - **Notebook**: lined paper, handwriting, tape and highlighter. A chalkboard in dark mode.
 
-  System / Light / Dark applies to every theme that has both. **Reset to default look** goes back to the green HUD. The moving backgrounds (aurora, leaves, bubbles, snow) stay still if your phone's reduce-motion setting is on. The live camera view keeps the HUD look so the overlays stay readable on any photo.
+  System / Light / Dark applies to every theme that has both. **Reset to default look** goes back to the green HUD. Vapor has a rotating marble bust standing on the horizon in front of the sun (an original 3D sculpture rendered as a dithered GIF), with a neon grid rolling towards you, palm trees, floating wireframe shapes, a leaping dolphin and a VHS tracking band; the bust also turns in the header and on the theme's card. In every theme, panels rise in when a page opens and buttons spring when pressed. The moving backgrounds (aurora, leaves, bubbles, snow, the bust) stay still if your phone's reduce-motion setting is on. The live camera view keeps the HUD look so the overlays stay readable on any photo.
 - **Swipe between pages.** Swipe left or right anywhere on a page to go to the next or previous one (Convert, Scan, Settings). The page follows your finger. The quick reference tables, text fields and drag handles keep their own swipes.
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
@@ -118,6 +118,7 @@ Project layout:
 | `js/price-parser.js` | Finds prices and their currencies in recognised text |
 | `js/language.js` | Script models, language detection and language → currency |
 | `js/layout.js` | Matches each price with its item name on the photo |
+| `img/vapor-bust.gif` | The Vapor theme's rotating marble bust (and `vapor-bust-still.png` for reduce motion) |
 | `js/widget-art.js` | The widgets' art and frame for each theme (generated; loaded only in the Android app) |
 | `js/translate.js` | Translation (on-device or MyMemory) |
 | `js/rates.js` | Downloads and caches exchange rates |

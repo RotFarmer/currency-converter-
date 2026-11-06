@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v26'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v27'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
