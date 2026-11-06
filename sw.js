@@ -1,7 +1,7 @@
 // Service worker: makes the app open instantly and work offline.
 // Bump VERSION (and APP_VERSION in js/app.js) whenever app files change.
 
-const VERSION = 'v23';
+const VERSION = 'v24';
 const APP_CACHE = `app-${VERSION}`;
 const OCR_CACHE = 'ocr-tesseract-7.0.0';
 

@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v23'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v24'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -139,7 +139,10 @@ function sendWidgetData() {
   const rates = getRates();
   const { home } = settings;
   const css = getComputedStyle(document.documentElement);
-  const color = (name, fallback) => hexColor(css.getPropertyValue(name).trim(), fallback);
+  const color = (name, fallback) => {
+    const value = css.getPropertyValue(name).trim();
+    return value ? hexColor(value, fallback || '#000000') : fallback;
+  };
   const money = {};
   for (const { code } of CURRENCIES) {
     if (rates && !rates.rates[code]) continue;
@@ -160,12 +163,13 @@ function sendWidgetData() {
     ratesUpdatedAt: rates?.updatedAt || 0,
     ratesFetchedAt: rates?.fetchedAt || 0,
     ...(settings.autoSource ? getZoneTables() : {}),
+    // A theme can give its widgets their own colours (--widget-…); otherwise they match its panels.
     colors: {
-      bg: color('--panel', '#040605'),
-      text: color('--text', '#cfe3d3'),
-      dim: color('--text-faint', '#6f8a76'),
-      accent: color('--accent', '#7dff72'),
-      line: color('--line-strong', '#2a5636'),
+      bg: color('--widget-bg', '') || color('--panel', '#040605'),
+      text: color('--widget-text', '') || color('--text', '#cfe3d3'),
+      dim: color('--widget-dim', '') || color('--text-faint', '#6f8a76'),
+      accent: color('--widget-accent', '') || color('--accent', '#7dff72'),
+      line: color('--widget-line', '') || color('--line-strong', '#2a5636'),
     },
   };
   const json = JSON.stringify(data);

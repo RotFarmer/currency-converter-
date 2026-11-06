@@ -62,7 +62,7 @@ On Android you can install Converter as a real app, with three home-screen widge
 
    You can also long-press the app icon and tap **Live camera**.
 
-   The widgets are drawn in your theme's colours and show the country at the top. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
+   The widgets are drawn in your theme's colours (Iron Beetle gives them a dark forest green) and show the country at the top. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
 
 Text in the app and its widgets stays the size it was designed at, whatever font size your phone is set to.
 
