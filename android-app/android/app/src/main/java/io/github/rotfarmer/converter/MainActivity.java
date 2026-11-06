@@ -16,6 +16,8 @@ public class MainActivity extends BridgeActivity {
         // Lets the web app send the home-screen widgets their data.
         registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
+        // Keep the app's own text sizes: the web view would otherwise scale text with the phone's font size setting.
+        if (bridge != null) bridge.getWebView().getSettings().setTextZoom(100);
     }
 
     @Override

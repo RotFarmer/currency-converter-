@@ -1942,6 +1942,11 @@
 }
 :root:is([data-skin="vapor"], [data-skin="pixel"]) .ref-chip { font-size: 19px; }
 :root:is([data-skin="vapor"], [data-skin="pixel"]) :is(.picker-row .sub, .scan-intro > p, .hint, .list-row .row-hint) { font-size: 18px; line-height: 1.3; }
+/* Pixel fonts are wide: on small phones the ☰ drawer's amount boxes shrink so each row still fits */
+@media (max-width: 380px) {
+  :root:is([data-skin="vapor"], [data-skin="pixel"]) .extra-input { min-width: 3.2em; font-size: 22px; }
+  :root:is([data-skin="vapor"], [data-skin="pixel"]) .extra-row { gap: 7px; }
+}
 :root[data-skin="notebook"] :is(.add-btn, .badge, .ref-head, .readout .k, .picker-section, .skin-name, .menu-btn, .field-label) { font-size: 16px; letter-spacing: 0.02em; }
 :root[data-skin="notebook"] .badge { font-size: 13px; }
 

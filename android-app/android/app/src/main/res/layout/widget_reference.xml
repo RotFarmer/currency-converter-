@@ -53,7 +53,7 @@
                 android:maxLines="1"
                 android:text="🇯🇵 JAPAN"
                 android:textColor="#CFE3D3"
-                android:textSize="11sp"
+                android:textSize="11dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -67,7 +67,7 @@
                 android:maxLines="1"
                 android:text="JPY → USD"
                 android:textColor="#7DFF72"
-                android:textSize="11sp"
+                android:textSize="11dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -82,7 +82,7 @@
                 android:paddingBottom="4dp"
                 android:text="3h ⟳"
                 android:textColor="#6F8A76"
-                android:textSize="10sp" />
+                android:textSize="10dp" />
         </LinearLayout>
 
         <ImageView
@@ -103,7 +103,7 @@
             android:fontFamily="monospace"
             android:text="@string/widget_setup"
             android:textColor="#6F8A76"
-            android:textSize="13sp"
+            android:textSize="13dp"
             android:visibility="gone" />
 
         <LinearLayout
@@ -124,7 +124,7 @@
                 android:maxLines="1"
                 android:text="¥100"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row1_to"
@@ -134,7 +134,7 @@
                 android:maxLines="1"
                 android:text="$0.66"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -156,7 +156,7 @@
                 android:maxLines="1"
                 android:text="¥200"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row2_to"
@@ -166,7 +166,7 @@
                 android:maxLines="1"
                 android:text="$1.31"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -188,7 +188,7 @@
                 android:maxLines="1"
                 android:text="¥500"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row3_to"
@@ -198,7 +198,7 @@
                 android:maxLines="1"
                 android:text="$3.28"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -220,7 +220,7 @@
                 android:maxLines="1"
                 android:text="¥1,000"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row4_to"
@@ -230,7 +230,7 @@
                 android:maxLines="1"
                 android:text="$6.56"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -252,7 +252,7 @@
                 android:maxLines="1"
                 android:text="¥2,000"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row5_to"
@@ -262,7 +262,7 @@
                 android:maxLines="1"
                 android:text="$13.11"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -284,7 +284,7 @@
                 android:maxLines="1"
                 android:text="¥5,000"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row6_to"
@@ -294,7 +294,7 @@
                 android:maxLines="1"
                 android:text="$32.79"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -316,7 +316,7 @@
                 android:maxLines="1"
                 android:text="¥10,000"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row7_to"
@@ -326,7 +326,7 @@
                 android:maxLines="1"
                 android:text="$65.57"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -348,7 +348,7 @@
                 android:maxLines="1"
                 android:text="¥20,000"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row8_to"
@@ -358,7 +358,7 @@
                 android:maxLines="1"
                 android:text="$131.15"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -380,7 +380,7 @@
                 android:maxLines="1"
                 android:text="¥50,000"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row9_to"
@@ -390,7 +390,7 @@
                 android:maxLines="1"
                 android:text="$327.87"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -412,7 +412,7 @@
                 android:maxLines="1"
                 android:text="¥100,000"
                 android:textColor="#CFE3D3"
-                android:textSize="14sp" />
+                android:textSize="14dp" />
 
             <TextView
                 android:id="@+id/row10_to"
@@ -422,7 +422,7 @@
                 android:maxLines="1"
                 android:text="$655.74"
                 android:textColor="#7DFF72"
-                android:textSize="14sp"
+                android:textSize="14dp"
                 android:textStyle="bold" />
         </LinearLayout>
 

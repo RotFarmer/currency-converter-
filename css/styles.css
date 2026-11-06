@@ -128,7 +128,8 @@
 :root[data-font="clean"] body { font-variant-numeric: tabular-nums; }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* Text stays the size the app sets, whatever the browser or phone would enlarge it to */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 body {
   margin: 0;
@@ -540,6 +541,33 @@ main { padding: 16px 16px 0; }
   flex-shrink: 0;
 }
 .row-remove svg { width: 14px; height: 14px; stroke-width: 2; }
+/* Drag handle for putting the ☰ currencies in your own order */
+.row-handle {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 36px;
+  margin: -4px -4px -4px -6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+}
+.row-handle svg { width: 18px; height: 18px; stroke-width: 3.2; }
+.row-handle:focus-visible { color: var(--accent); }
+#extra-list.sorting .extra-row:not(.dragging) { transition: transform 0.18s ease; }
+#extra-list.sorting { user-select: none; -webkit-user-select: none; }
+.extra-row.dragging {
+  position: relative;
+  z-index: 2;
+  background: var(--panel-2);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--accent-dim);
+  cursor: grabbing;
+}
+.extra-row.dragging .row-handle { color: var(--accent); cursor: grabbing; }
 .add-btn {
   display: flex;
   align-items: center;

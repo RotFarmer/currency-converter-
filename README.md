@@ -20,7 +20,7 @@ A currency converter for your phone. Set a default currency once, and every pric
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
 - **Quick reference tabs.** Tables of amounts, always shown in your home currency: one tab for your "Price in" currency and one for each currency in the ☰ drawer. Swipe left/right or tap a tab to switch; tap a row to put that amount in the converter. Tap **Edit** to choose the amounts for the currency on screen: remove the ones you don't need, type your own, or add back suggested ones. Each currency keeps its own list, and **Reset** brings back the suggested amounts.
-- **Up to 10 other currencies.** Tap ☰ **Other currencies** under your home currency to open a drawer with your extra currencies. Tap **+** to add one (up to 10) and **×** to remove one.
+- **Up to 10 other currencies.** Tap ☰ **Other currencies** under your home currency to open a drawer with your extra currencies. Tap **+** to add one (up to 10) and **×** to remove one. Drag a currency by its handle (⋮⋮) to put them in your own order; the quick reference tabs and the widgets follow it.
 - **Type in any currency.** Every amount, including those in the ☰ drawer, can be typed into; all the others update. 0 in any of them makes them all 0.
 - **Live camera.** Point the in-app camera at price tags or a menu and converted prices appear on screen as you move. Tap the shutter for a full scan with translation.
 - **Scan photos.** Take a photo (or pick one) of a price tag, menu or receipt. Each price is found and covered with its converted amount, right on the photo. Tap a price to fix a misread number or change its currency.
@@ -62,6 +62,8 @@ On Android you can install Converter as a real app, with three home-screen widge
    You can also long-press the app icon and tap **Live camera**.
 
    The widgets are drawn in your theme's colours and show the country at the top. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
+
+Text in the app and its widgets stays the size it was designed at, whatever font size your phone is set to.
 
 The app opens the same site as the web version, so updates to the app's features arrive by themselves. You only need to download the APK again when the app or the widgets themselves change. The widgets refresh rates every few hours on their own, even if you don't open the app.
 

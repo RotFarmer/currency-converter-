@@ -53,7 +53,7 @@
                 android:maxLines="1"
                 android:text="🇯🇵 JAPAN"
                 android:textColor="#CFE3D3"
-                android:textSize="11sp"
+                android:textSize="11dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -67,7 +67,7 @@
                 android:maxLines="1"
                 android:text="JPY → USD"
                 android:textColor="#7DFF72"
-                android:textSize="11sp"
+                android:textSize="11dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -82,7 +82,7 @@
                 android:paddingBottom="4dp"
                 android:text="3h ⟳"
                 android:textColor="#6F8A76"
-                android:textSize="10sp" />
+                android:textSize="10dp" />
         </LinearLayout>
 
         <ImageView
@@ -140,7 +140,7 @@
                         android:maxLines="1"
                         android:text="@string/scan_button"
                         android:textColor="#7DFF72"
-                        android:textSize="13sp"
+                        android:textSize="13dp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -152,7 +152,7 @@
                         android:maxLines="1"
                         android:text="@string/scan_button_hint"
                         android:textColor="#6F8A76"
-                        android:textSize="11sp" />
+                        android:textSize="11dp" />
                 </LinearLayout>
             </LinearLayout>
         </FrameLayout>
@@ -168,7 +168,7 @@
             android:maxLines="1"
             android:text="LAST SCAN · 5 MIN. AGO"
             android:textColor="#6F8A76"
-            android:textSize="10sp" />
+            android:textSize="10dp" />
 
         <TextView
             android:id="@+id/scan_empty"
@@ -178,7 +178,7 @@
             android:fontFamily="monospace"
             android:text="@string/scan_empty"
             android:textColor="#6F8A76"
-            android:textSize="12sp"
+            android:textSize="12dp"
             android:visibility="gone" />
 
         <LinearLayout
@@ -200,7 +200,7 @@
                 android:maxLines="1"
                 android:text="Ramen"
                 android:textColor="#CFE3D3"
-                android:textSize="13sp" />
+                android:textSize="13dp" />
 
             <TextView
                 android:id="@+id/scan_row1_value"
@@ -210,7 +210,7 @@
                 android:maxLines="1"
                 android:text="¥1,080 → $7.08"
                 android:textColor="#7DFF72"
-                android:textSize="13sp"
+                android:textSize="13dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -233,7 +233,7 @@
                 android:maxLines="1"
                 android:text="Gyoza"
                 android:textColor="#CFE3D3"
-                android:textSize="13sp" />
+                android:textSize="13dp" />
 
             <TextView
                 android:id="@+id/scan_row2_value"
@@ -243,7 +243,7 @@
                 android:maxLines="1"
                 android:text="¥450 → $2.95"
                 android:textColor="#7DFF72"
-                android:textSize="13sp"
+                android:textSize="13dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -266,7 +266,7 @@
                 android:maxLines="1"
                 android:text="Beer"
                 android:textColor="#CFE3D3"
-                android:textSize="13sp" />
+                android:textSize="13dp" />
 
             <TextView
                 android:id="@+id/scan_row3_value"
@@ -276,7 +276,7 @@
                 android:maxLines="1"
                 android:text="¥600 → $3.93"
                 android:textColor="#7DFF72"
-                android:textSize="13sp"
+                android:textSize="13dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -299,7 +299,7 @@
                 android:maxLines="1"
                 android:text=""
                 android:textColor="#CFE3D3"
-                android:textSize="13sp" />
+                android:textSize="13dp" />
 
             <TextView
                 android:id="@+id/scan_row4_value"
@@ -309,7 +309,7 @@
                 android:maxLines="1"
                 android:text="¥300 → $1.97"
                 android:textColor="#7DFF72"
-                android:textSize="13sp"
+                android:textSize="13dp"
                 android:textStyle="bold" />
         </LinearLayout>
 

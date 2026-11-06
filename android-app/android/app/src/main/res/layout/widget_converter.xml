@@ -53,7 +53,7 @@
                 android:maxLines="1"
                 android:text="🇯🇵 JAPAN"
                 android:textColor="#CFE3D3"
-                android:textSize="11sp"
+                android:textSize="11dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -67,7 +67,7 @@
                 android:maxLines="1"
                 android:text="JPY → USD"
                 android:textColor="#7DFF72"
-                android:textSize="11sp"
+                android:textSize="11dp"
                 android:textStyle="bold" />
 
             <TextView
@@ -82,7 +82,7 @@
                 android:paddingBottom="4dp"
                 android:text="3h ⟳"
                 android:textColor="#6F8A76"
-                android:textSize="10sp" />
+                android:textSize="10dp" />
         </LinearLayout>
 
         <ImageView
@@ -107,29 +107,29 @@
                 android:id="@+id/input"
                 android:layout_width="match_parent"
                 android:layout_height="34dp"
-                android:autoSizeMaxTextSize="26sp"
-                android:autoSizeMinTextSize="12sp"
+                android:autoSizeMaxTextSize="26dp"
+                android:autoSizeMinTextSize="12dp"
                 android:autoSizeTextType="uniform"
                 android:fontFamily="monospace"
                 android:gravity="end|center_vertical"
                 android:maxLines="1"
                 android:text="¥1,280"
                 android:textColor="#CFE3D3"
-                android:textSize="26sp" />
+                android:textSize="26dp" />
 
             <TextView
                 android:id="@+id/output"
                 android:layout_width="match_parent"
                 android:layout_height="22dp"
-                android:autoSizeMaxTextSize="16sp"
-                android:autoSizeMinTextSize="10sp"
+                android:autoSizeMaxTextSize="16dp"
+                android:autoSizeMinTextSize="10dp"
                 android:autoSizeTextType="uniform"
                 android:fontFamily="monospace"
                 android:gravity="end|center_vertical"
                 android:maxLines="1"
                 android:text="= $8.39"
                 android:textColor="#7DFF72"
-                android:textSize="16sp"
+                android:textSize="16dp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -156,7 +156,7 @@
                     android:gravity="center"
                     android:text="7"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_8"
                     android:layout_width="0dp"
@@ -168,7 +168,7 @@
                     android:gravity="center"
                     android:text="8"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_9"
                     android:layout_width="0dp"
@@ -180,7 +180,7 @@
                     android:gravity="center"
                     android:text="9"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_back"
                     android:layout_width="0dp"
@@ -192,7 +192,7 @@
                     android:gravity="center"
                     android:text="⌫"
                     android:textColor="#7DFF72"
-                    android:textSize="18sp" android:textStyle="bold" />
+                    android:textSize="18dp" android:textStyle="bold" />
             </LinearLayout>
             <LinearLayout
                 android:layout_width="match_parent"
@@ -211,7 +211,7 @@
                     android:gravity="center"
                     android:text="4"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_5"
                     android:layout_width="0dp"
@@ -223,7 +223,7 @@
                     android:gravity="center"
                     android:text="5"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_6"
                     android:layout_width="0dp"
@@ -235,7 +235,7 @@
                     android:gravity="center"
                     android:text="6"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_clear"
                     android:layout_width="0dp"
@@ -247,7 +247,7 @@
                     android:gravity="center"
                     android:text="C"
                     android:textColor="#7DFF72"
-                    android:textSize="18sp" android:textStyle="bold" />
+                    android:textSize="18dp" android:textStyle="bold" />
             </LinearLayout>
             <LinearLayout
                 android:layout_width="match_parent"
@@ -266,7 +266,7 @@
                     android:gravity="center"
                     android:text="1"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_2"
                     android:layout_width="0dp"
@@ -278,7 +278,7 @@
                     android:gravity="center"
                     android:text="2"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_3"
                     android:layout_width="0dp"
@@ -290,7 +290,7 @@
                     android:gravity="center"
                     android:text="3"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_swap"
                     android:layout_width="0dp"
@@ -302,7 +302,7 @@
                     android:gravity="center"
                     android:text="⇄"
                     android:textColor="#7DFF72"
-                    android:textSize="18sp" android:textStyle="bold" />
+                    android:textSize="18dp" android:textStyle="bold" />
             </LinearLayout>
             <LinearLayout
                 android:layout_width="match_parent"
@@ -321,7 +321,7 @@
                     android:gravity="center"
                     android:text="0"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_00"
                     android:layout_width="0dp"
@@ -333,7 +333,7 @@
                     android:gravity="center"
                     android:text="00"
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
                 <TextView
                     android:id="@+id/key_dot"
                     android:layout_width="0dp"
@@ -345,7 +345,7 @@
                     android:gravity="center"
                     android:text="."
                     android:textColor="#CFE3D3"
-                    android:textSize="18sp" />
+                    android:textSize="18dp" />
             </LinearLayout>
         </LinearLayout>
 

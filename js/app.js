@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v19'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v20'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -613,7 +613,8 @@ function renderExtraCurrencies() {
           .map((code) => {
             const currency = getCurrency(code);
             const glyph = symbolGlyph(currency);
-            return `<div class="extra-row">
+            return `<div class="extra-row" data-code="${code}">
+              <button type="button" class="row-handle" data-handle="${code}" aria-label="Move ${code}: drag, or use the arrow keys"><svg><use href="#i-grip"/></svg></button>
               <span class="sym${glyph.length > 2 ? ' long' : ''}" aria-hidden="true">${escapeHtml(glyph)}</span>
               <span class="code">${code}</span>
               <span class="name">${escapeHtml(currency.name)}</span>
@@ -649,6 +650,97 @@ function saveExtra() {
   renderExtraCurrencies();
   renderReference();
 }
+
+// Putting the ☰ currencies in your own order: drag a row by its handle (⋮⋮), or focus the handle and use
+// the arrow keys. The order is also the order of the quick reference tabs and of the widgets.
+let drag = null;
+
+function moveExtra(from, to) {
+  if (to < 0 || to >= settings.extra.length || to === from) return;
+  const extra = [...settings.extra];
+  const [code] = extra.splice(from, 1);
+  extra.splice(to, 0, code);
+  settings.extra = extra;
+  saveExtra();
+}
+
+$('#extra-list').addEventListener('pointerdown', (event) => {
+  const handle = event.target.closest('.row-handle');
+  if (!handle || drag || settings.extra.length < 2) return;
+  event.preventDefault();
+  const rows = $$('#extra-list .extra-row');
+  const row = handle.closest('.extra-row');
+  const from = rows.indexOf(row);
+  // Row positions on the page (not the screen), so scrolling while dragging is fine.
+  const tops = rows.map((r) => r.getBoundingClientRect().top + scrollY);
+  const step = rows.length > 1 ? tops[1] - tops[0] : row.offsetHeight;
+  drag = { pointerId: event.pointerId, rows, row, tops, step, from, to: from, startY: event.clientY + scrollY, lastY: event.clientY, scrollTimer: 0 };
+  handle.setPointerCapture(event.pointerId);
+  row.classList.add('dragging');
+  $('#extra-list').classList.add('sorting');
+});
+
+function dragTo(clientY) {
+  const { rows, tops, step, from, row } = drag;
+  drag.lastY = clientY;
+  const dy = clientY + scrollY - drag.startY;
+  row.style.transform = `translate3d(0, ${dy}px, 0)`;
+  const middle = tops[from] + step / 2 + dy;
+  let to = 0;
+  tops.forEach((top, i) => {
+    if (i !== from && top + step / 2 < middle) to++;
+  });
+  drag.to = to;
+  rows.forEach((other, i) => {
+    if (i === from) return;
+    let shift = 0;
+    if (from < to && i > from && i <= to) shift = -step;
+    if (from > to && i >= to && i < from) shift = step;
+    other.style.transform = shift ? `translate3d(0, ${shift}px, 0)` : '';
+  });
+}
+
+/** Near the top or bottom of the screen the page scrolls, so a long list can be sorted. */
+function dragAutoScroll() {
+  if (!drag) return;
+  const top = $('.topbar').getBoundingClientRect().bottom + 40;
+  const bottom = $('.tabbar').getBoundingClientRect().top - 40;
+  const speed = drag.lastY < top ? -10 : drag.lastY > bottom ? 10 : 0;
+  if (speed) {
+    window.scrollBy(0, speed);
+    dragTo(drag.lastY);
+  }
+  drag.scrollTimer = requestAnimationFrame(dragAutoScroll);
+}
+
+$('#extra-list').addEventListener('pointermove', (event) => {
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  dragTo(event.clientY);
+  if (!drag.scrollTimer) drag.scrollTimer = requestAnimationFrame(dragAutoScroll);
+});
+
+function endDrag(event) {
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  const { from, to, rows, row, scrollTimer } = drag;
+  cancelAnimationFrame(scrollTimer);
+  drag = null;
+  $('#extra-list').classList.remove('sorting');
+  row.classList.remove('dragging');
+  for (const r of rows) r.style.transform = '';
+  if (event.type === 'pointerup') moveExtra(from, to);
+}
+$('#extra-list').addEventListener('pointerup', endDrag);
+$('#extra-list').addEventListener('pointercancel', endDrag);
+
+$('#extra-list').addEventListener('keydown', (event) => {
+  const handle = event.target.closest('.row-handle');
+  if (!handle || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+  event.preventDefault();
+  const code = handle.dataset.handle;
+  const from = settings.extra.indexOf(code);
+  moveExtra(from, from + (event.key === 'ArrowUp' ? -1 : 1));
+  $(`.row-handle[data-handle="${code}"]`)?.focus();
+});
 
 $('#extra-menu').addEventListener('click', () => {
   settings.extraOpen = !settings.extraOpen;
