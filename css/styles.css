@@ -385,6 +385,7 @@ main { padding: 16px 16px 0; }
 /* ---------- Converter ---------- */
 
 .money-field { padding: 4px 0; }
+.money-field + .money-field { margin-top: 10px; }
 
 .field-label {
   display: flex;
@@ -517,9 +518,9 @@ main { padding: 16px 16px 0; }
 .menu-btn[aria-expanded="true"]::before { background: var(--menu-open-fill); }
 .menu-btn[aria-expanded="true"] .menu-chevron { transform: rotate(180deg); }
 
-/* The "sandwich": extra currencies tucked between the two amounts */
+/* The "sandwich": extra currencies in a drawer under the home currency */
 .extra {
-  margin: 0 0 10px;
+  margin: 0;
   padding: 8px 12px 12px;
   border: 1px solid var(--line-strong);
   border-top: 2px solid var(--accent-dim);

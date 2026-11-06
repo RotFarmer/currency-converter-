@@ -22,7 +22,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v13'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v14'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -541,7 +541,19 @@ function saveExtra() {
 $('#extra-menu').addEventListener('click', () => {
   settings.extraOpen = !settings.extraOpen;
   saveExtra();
+  if (settings.extraOpen) requestAnimationFrame(revealExtra);
 });
+
+/** The drawer opens downwards near the bottom of the screen: scroll so it can be seen, keeping its button in view. */
+function revealExtra() {
+  const panelBottom = $('.converter').getBoundingClientRect().bottom;
+  const button = $('#extra-menu').getBoundingClientRect();
+  const visibleBottom = $('.tabbar').getBoundingClientRect().top - 8;
+  const visibleTop = $('.topbar').getBoundingClientRect().bottom + 12;
+  const overflow = panelBottom - visibleBottom;
+  if (overflow <= 0) return;
+  window.scrollBy({ top: Math.min(overflow, button.top - visibleTop), behavior: 'smooth' });
+}
 
 $('#extra-add').addEventListener('click', () => {
   openPicker({
