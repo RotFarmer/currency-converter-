@@ -8,10 +8,20 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#040605">
   <script>
-    // Apply a chosen light/dark theme before the page draws, so it doesn't flash.
+    // Apply the saved look (light/dark, accent colour, effects, font) before the page draws,
+    // so it doesn't flash the default theme first.
     try {
-      var theme = (JSON.parse(localStorage.getItem('cc.settings')) || {}).theme;
-      if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+      var s = JSON.parse(localStorage.getItem('cc.settings')) || {};
+      var root = document.documentElement;
+      if (s.theme === 'light' || s.theme === 'dark') root.dataset.theme = s.theme;
+      var dark = s.theme === 'dark' || (s.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+      var cache = JSON.parse(localStorage.getItem('cc.themeCache')) || {};
+      if (cache.dark || cache.light) root.style.cssText = dark ? cache.dark : cache.light;
+      var fx = s.fx || {};
+      if (fx.scanlines === false) root.dataset.scanlines = 'off';
+      if (fx.grid === false) root.dataset.grid = 'off';
+      if (fx.glow === false) root.dataset.glow = 'off';
+      if (s.font === 'clean') root.dataset.font = 'clean';
     } catch (e) {}
   </script>
   <meta name="mobile-web-app-capable" content="yes">
@@ -221,6 +231,42 @@
             <button type="button" data-theme-option="light" aria-pressed="false">Light</button>
             <button type="button" data-theme-option="dark" aria-pressed="false">Dark</button>
           </div>
+
+          <div class="setting-label">Accent colour</div>
+          <div class="swatches" id="accent-options" role="group" aria-label="Accent colour">
+            <button type="button" class="swatch" data-accent="default" style="--swatch:#7dff72" aria-pressed="false">Default</button>
+            <button type="button" class="swatch" data-accent="amber" style="--swatch:#ffb000" aria-pressed="false">Amber</button>
+            <button type="button" class="swatch" data-accent="ice" style="--swatch:#5ad7ff" aria-pressed="false">Ice</button>
+            <button type="button" class="swatch" data-accent="crimson" style="--swatch:#ff4d5e" aria-pressed="false">Crimson</button>
+            <button type="button" class="swatch" data-accent="violet" style="--swatch:#b18cff" aria-pressed="false">Violet</button>
+            <button type="button" class="swatch" data-accent="mono" style="--swatch:#e6e6e6" aria-pressed="false">Mono</button>
+            <label class="swatch custom" id="accent-custom-swatch" aria-pressed="false">
+              <input type="color" id="accent-custom" class="file-input" value="#7dff72" aria-label="Custom accent colour">
+              Custom
+            </label>
+          </div>
+
+          <div class="setting-label">Font</div>
+          <div class="segmented full" id="font-options" role="group" aria-label="Font">
+            <button type="button" data-font-option="hud" aria-pressed="false">HUD</button>
+            <button type="button" data-font-option="clean" aria-pressed="false">Clean</button>
+          </div>
+
+          <div class="setting-label">Effects</div>
+          <label class="list-row compact">
+            <span class="row-text"><span class="row-label">Scanlines</span></span>
+            <input type="checkbox" class="switch" data-fx="scanlines" role="switch">
+          </label>
+          <label class="list-row compact">
+            <span class="row-text"><span class="row-label">Background grid</span></span>
+            <input type="checkbox" class="switch" data-fx="grid" role="switch">
+          </label>
+          <label class="list-row compact">
+            <span class="row-text"><span class="row-label">Glow</span></span>
+            <input type="checkbox" class="switch" data-fx="glow" role="switch">
+          </label>
+
+          <button type="button" class="btn btn-secondary reset-look" id="reset-look">Reset to default look</button>
         </div>
 
         <div class="panel list">

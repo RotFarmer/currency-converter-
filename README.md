@@ -1,6 +1,6 @@
 # Currency Converter
 
-A currency converter for your phone, with a minimal mech-HUD look in dark or light (or matching your phone's setting: Settings → Appearance). Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
+A currency converter for your phone, with a minimal mech-HUD look in dark or light (or matching your phone's setting). Settings → Appearance also lets you pick an accent colour (presets or any colour), switch scanlines, grid and glow on or off, and choose the HUD or a clean font; **Reset to default look** brings back the original green. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
 
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
@@ -79,6 +79,7 @@ Project layout:
 | `js/layout.js` | Matches each price with its item name on the photo |
 | `js/translate.js` | Translation (on-device or MyMemory) |
 | `js/rates.js` | Downloads and caches exchange rates |
+| `js/theme.js` | Builds the colour set for a custom accent colour (dark and light) |
 | `js/currencies.js` | Currency names, symbols, decimals and the currency of each country |
 | `js/location.js` | Works out the country: GPS + reverse geocoding, or the time zone |
 | `js/timezones.js` | Time zone → country table (generated from the IANA time zone database) |
