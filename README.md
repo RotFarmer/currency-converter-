@@ -1,7 +1,19 @@
 # Currency Converter
 
-A currency converter for your phone, with a minimal mech-HUD look in dark or light (or matching your phone's setting). Settings → Appearance also lets you pick an accent colour (presets or any colour), switch scanlines, grid and glow on or off, and choose the HUD or a clean font; **Reset to default look** brings back the original green. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
+A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with nine whole-app themes, from the default mech-HUD look to medieval parchment and Windows 95.
 
+- **Themes.** Settings → Appearance → Theme changes the fonts, colours and the shape of every panel, button and switch:
+  - **HUD** (default): phosphor green mech HUD. Pick an accent colour (presets or any colour), turn scanlines, grid and glow on or off, and choose the HUD or a clean font.
+  - **Medieval**: parchment, blackletter title, gilded corners, wax-seal buttons. Candlelit at night.
+  - **Cottage**: gingham and lace, soft serif with handwritten labels, sage and dusty rose. Evening fireflies in dark mode.
+  - **Cloud**: pastel sky with fluffy clouds, bubbly letters, pink-to-lavender buttons, a floating tab bar. Night clouds in dark mode.
+  - **Aero**: Frutiger Aero glass panels, sky and bubbles, glossy aqua buttons.
+  - **90s**: Windows 95 grey bevels, blue title bars with ✕, checkboxes, a teal desktop. Light only.
+  - **Vapor**: vaporwave sunset, neon grid floor, chrome lettering. Dark only.
+  - **8-bit**: pixel fonts, chunky pixel borders, a starfield. Dark only.
+  - **Notebook**: lined paper, handwriting, tape and highlighter. A chalkboard in dark mode.
+
+  System / Light / Dark applies to every theme that has both. **Reset to default look** goes back to the green HUD. The live camera view keeps the HUD look so the overlays stay readable on any photo.
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
 - **Quick reference tabs.** Ready-made tables of common amounts, always shown in your home currency: one tab for your "Price in" currency and one for each currency in the ☰ drawer. Swipe left/right or tap a tab to switch; tap a row to put that amount in the converter.
@@ -70,6 +82,7 @@ Project layout:
 | Path | What it does |
 | --- | --- |
 | `index.html`, `css/styles.css` | Page structure and the HUD theme (dark and light colour sets; the camera view always stays dark) |
+| `css/skins.css` | The other themes. Each sets `data-skin` on the page and restyles fonts, colours and components; `data-mode` picks its dark version |
 | `js/app.js` | Screens, settings and user interaction |
 | `js/camera.js` | The in-app live camera (start/stop, flashlight, grabbing frames) |
 | `js/scan.js` | Photo pipeline: prices, language identification, re-reading in the right script |
@@ -79,16 +92,16 @@ Project layout:
 | `js/layout.js` | Matches each price with its item name on the photo |
 | `js/translate.js` | Translation (on-device or MyMemory) |
 | `js/rates.js` | Downloads and caches exchange rates |
-| `js/theme.js` | Builds the colour set for a custom accent colour (dark and light) |
+| `js/theme.js` | The theme list, and the colour set for a custom HUD accent colour (dark and light) |
 | `js/currencies.js` | Currency names, symbols, decimals and the currency of each country |
 | `js/location.js` | Works out the country: GPS + reverse geocoding, or the time zone |
 | `js/timezones.js` | Time zone → country table (generated from the IANA time zone database) |
 | `js/format.js` | Number formatting and parsing |
 | `sw.js` | Service worker for offline use |
-| `fonts/` | Share Tech Mono and Chakra Petch (SIL Open Font License) |
+| `fonts/` | Share Tech Mono and Chakra Petch; `fonts/skins/` holds the theme fonts, loaded only when a theme uses them (all SIL Open Font License) |
 | `tests/` | Unit tests (`node --test`) |
 
-When you change any app file, bump `VERSION` in `sw.js` and `APP_VERSION` in `js/app.js` (shown at the bottom of Settings). The app always loads the newest files when online and uses its saved copy only offline; when a new service worker takes over, open pages reload themselves once.
+When you change any app file, bump `VERSION` in `sw.js` and `APP_VERSION` in `js/app.js` (shown at the bottom of Settings). If you add a light-only or dark-only theme, list it in both `SKINS` (`js/theme.js`) and the small script in the `<head>` of `index.html`, which applies the saved theme before the page draws. The app always loads the newest files when online and uses its saved copy only offline; when a new service worker takes over, open pages reload themselves once.
 
 ### How the language is identified
 

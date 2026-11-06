@@ -10,7 +10,7 @@ import {
   regionName,
 } from './currencies.js';
 import { detectRegion } from './location.js';
-import { ACCENT_PRESETS, accentPalette, toCssText } from './theme.js';
+import { ACCENT_PRESETS, SKINS, accentPalette, skinById, toCssText } from './theme.js';
 import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
@@ -22,7 +22,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v11'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v12'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -50,6 +50,7 @@ const settings = {
   homeChosen: false, // the user picked their home currency themselves
   autoSource: true, // keep "prices in" set to the currency where the phone is
   sourceRegion: null, // country detected for "prices in"
+  skin: 'hud', // whole-app theme, see SKINS in theme.js
   theme: 'system', // "system" follows the phone; or "light" / "dark"
   accent: 'default', // a preset id or a custom "#rrggbb"
   font: 'hud',
@@ -82,7 +83,7 @@ function setCurrency(role, code) {
 
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 
-const DEFAULT_LOOK = { accent: 'default', font: 'hud', fx: { scanlines: true, grid: true, glow: true } };
+const DEFAULT_LOOK = { skin: 'hud', accent: 'default', font: 'hud', fx: { scanlines: true, grid: true, glow: true } };
 
 /** The custom accent colour, or null for the default green (which uses the stylesheet's colours). */
 function accentColor() {
@@ -99,26 +100,34 @@ function setAttr(name, on, value) {
 function applyTheme() {
   const { theme, fx } = settings;
   const root = document.documentElement;
+  const skin = skinById(settings.skin);
+  const hud = skin.id === 'hud';
   setAttr('theme', theme === 'light' || theme === 'dark', theme);
-  const dark = theme === 'dark' || (theme !== 'light' && darkQuery.matches);
+  // Some themes only come in light or only in dark.
+  const dark = skin.mode ? skin.mode === 'dark' : theme === 'dark' || (theme !== 'light' && darkQuery.matches);
+  setAttr('skin', !hud, skin.id);
+  setAttr('mode', !hud, dark ? 'dark' : 'light');
 
   // Accent colour: the whole colour set is built from it, for both modes.
   const color = accentColor();
   const palettes = { dark: color ? accentPalette(color, true) : {}, light: color ? accentPalette(color, false) : {} };
   if (!fx.glow && color) palettes.dark['--glow'] = palettes.light['--glow'] = 'transparent';
-  root.style.cssText = toCssText(dark ? palettes.dark : palettes.light);
+  // Accent colour and effects belong to the HUD theme; the other themes bring their own.
+  root.style.cssText = hud ? toCssText(dark ? palettes.dark : palettes.light) : '';
   // The camera and scanning overlay always use the dark colours.
   for (const el of [$('#camera'), $('#scan-progress')]) el.style.cssText = toCssText(palettes.dark);
   // Remembered so the next launch can apply it before the page draws.
   save('themeCache', { dark: toCssText(palettes.dark), light: toCssText(palettes.light) });
 
-  setAttr('scanlines', !fx.scanlines, 'off');
-  setAttr('grid', !fx.grid, 'off');
-  setAttr('glow', !fx.glow, 'off');
-  setAttr('font', settings.font === 'clean', 'clean');
+  setAttr('scanlines', hud && !fx.scanlines, 'off');
+  setAttr('grid', hud && !fx.grid, 'off');
+  setAttr('glow', hud && !fx.glow, 'off');
+  setAttr('font', hud && settings.font === 'clean', 'clean');
 
   // Colours the phone's status bar / browser bar to match.
-  $('meta[name="theme-color"]').setAttribute('content', dark ? palettes.dark['--bg'] || '#040605' : palettes.light['--bg'] || '#e9eee8');
+  const css = getComputedStyle(root);
+  const barColor = css.getPropertyValue('--theme-color').trim() || css.getPropertyValue('--bg').trim();
+  $('meta[name="theme-color"]').setAttribute('content', barColor || '#040605');
   renderAppearanceControls();
 }
 
@@ -126,7 +135,14 @@ function renderAppearanceControls() {
   const press = (selector, attr, value) => {
     for (const button of $$(selector)) button.setAttribute('aria-pressed', String(button.dataset[attr] === value));
   };
+  const skin = skinById(settings.skin);
+  press('[data-skin-option]', 'skinOption', skin.id);
   press('[data-theme-option]', 'themeOption', settings.theme || 'system');
+  $('#hud-options').hidden = skin.id !== 'hud';
+  const note = $('#skin-mode-note');
+  note.hidden = !skin.mode;
+  note.textContent = skin.mode ? `${skin.name} only comes in ${skin.mode}, so this switch applies to the other themes.` : '';
+  $('#theme-options').classList.toggle('muted', Boolean(skin.mode));
   press('[data-font-option]', 'fontOption', settings.font);
   const custom = /^#[0-9a-f]{6}$/i.test(settings.accent);
   press('[data-accent]', 'accent', custom ? null : settings.accent);
@@ -142,6 +158,12 @@ function saveLook() {
   applyTheme();
 }
 
+$('#skin-options').addEventListener('click', (event) => {
+  const card = event.target.closest('[data-skin-option]');
+  if (!card || !SKINS.some((skin) => skin.id === card.dataset.skinOption)) return;
+  settings.skin = card.dataset.skinOption;
+  saveLook();
+});
 $('#accent-options').addEventListener('click', (event) => {
   const swatch = event.target.closest('[data-accent]');
   if (!swatch) return;

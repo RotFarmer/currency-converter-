@@ -11,6 +11,25 @@ export const ACCENT_PRESETS = [
   { id: 'mono', name: 'Mono', color: '#e6e6e6' },
 ];
 
+// Whole-app themes. The HUD look (styles.css) is the default; the others live in css/skins.css.
+// "mode" marks themes that only come in light or only in dark. The head script in index.html
+// keeps its own copy of those, so update both together.
+export const SKINS = [
+  { id: 'hud', name: 'HUD' },
+  { id: 'medieval', name: 'Medieval' },
+  { id: 'cottage', name: 'Cottage' },
+  { id: 'cloud', name: 'Cloud' },
+  { id: 'aero', name: 'Aero' },
+  { id: 'retro95', name: '90s', mode: 'light' },
+  { id: 'vapor', name: 'Vapor', mode: 'dark' },
+  { id: 'pixel', name: '8-bit', mode: 'dark' },
+  { id: 'notebook', name: 'Notebook' },
+];
+
+export function skinById(id) {
+  return SKINS.find((skin) => skin.id === id) || SKINS[0];
+}
+
 export function hexToHsl(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
   if (!m) return null;

@@ -672,6 +672,9 @@ main { padding: 16px 16px 0; }
 .segmented.full { display: flex; width: 100%; }
 
 .setting-label { margin: 18px 0 8px; font: 600 11px var(--font-head); letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-dim); }
+.setting-label.first { margin-top: 4px; }
+.setting-note { margin: 8px 0 0; font-size: 13px; color: var(--text-faint); }
+.segmented.muted { opacity: 0.55; }
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 12px 6px; }
 .swatch {
   position: relative;
