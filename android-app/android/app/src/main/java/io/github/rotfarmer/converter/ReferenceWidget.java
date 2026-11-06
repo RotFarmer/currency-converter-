@@ -37,10 +37,10 @@ public class ReferenceWidget extends AppWidgetProvider {
 
     static RemoteViews build(Context context, AppWidgetManager manager, int widgetId, WidgetData data) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_reference);
-        Widgets.paintFrame(views, data);
+        Widgets.paintFrame(context, views, data, manager, widgetId, 240, 230);
         views.setOnClickPendingIntent(R.id.widget_root, Widgets.openApp(context));
         views.setOnClickPendingIntent(R.id.updated, Widgets.refresh(context));
-        views.setTextViewText(R.id.updated, Widgets.updatedText(data));
+        views.setTextViewText(R.id.updated, Widgets.text(data, Widgets.updatedText(data)));
         int text = Widgets.color(data, "text", 0xFFCFE3D3);
         int accent = Widgets.color(data, "accent", 0xFF7DFF72);
         views.setTextColor(R.id.empty, Widgets.color(data, "dim", 0xFF6F8A76));
@@ -48,13 +48,13 @@ public class ReferenceWidget extends AppWidgetProvider {
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
         double[] amounts = place == null ? new double[0] : data.amounts(place.code);
         String label = place == null ? null : place.label();
-        views.setTextViewText(R.id.title, label != null ? label.toUpperCase(Locale.getDefault()) : context.getString(R.string.reference_title));
-        views.setTextViewText(R.id.pair, place == null ? "" : place.code + " → " + data.home());
+        views.setTextViewText(R.id.title, Widgets.text(data, label != null ? label.toUpperCase(Locale.getDefault()) : context.getString(R.string.reference_title)));
+        views.setTextViewText(R.id.pair, Widgets.text(data, place == null ? "" : place.code + " → " + data.home()));
 
         if (amounts.length == 0) {
             int message = data == null ? R.string.widget_setup : place == null ? R.string.widget_no_currency : R.string.reference_no_amounts;
             views.setViewVisibility(R.id.empty, View.VISIBLE);
-            views.setTextViewText(R.id.empty, context.getString(message));
+            views.setTextViewText(R.id.empty, Widgets.text(data, context.getString(message)));
             for (int row : ROWS) views.setViewVisibility(row, View.GONE);
             return views;
         }
@@ -65,8 +65,8 @@ public class ReferenceWidget extends AppWidgetProvider {
             boolean show = i < amounts.length && i < fit;
             views.setViewVisibility(ROWS[i], show ? View.VISIBLE : View.GONE);
             if (!show) continue;
-            views.setTextViewText(FROM[i], data.formatAmount(amounts[i], place.code));
-            views.setTextViewText(TO[i], data.formatResult(data.convert(amounts[i], place.code, data.home()), data.home()));
+            views.setTextViewText(FROM[i], Widgets.text(data, data.formatAmount(amounts[i], place.code)));
+            views.setTextViewText(TO[i], Widgets.text(data, data.formatResult(data.convert(amounts[i], place.code, data.home()), data.home())));
             views.setTextColor(FROM[i], text);
             views.setTextColor(TO[i], accent);
         }

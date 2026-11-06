@@ -9,6 +9,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
+import org.json.JSONObject;
 
 /** Between the web app (js/app.js) and the native parts: the home-screen widgets and app updates. */
 @CapacitorPlugin(name = "Widgets")
@@ -17,7 +18,23 @@ public class WidgetBridgePlugin extends Plugin {
     /** Your currencies, quick reference amounts, last scan, rates or theme changed: save and redraw the widgets. */
     @PluginMethod
     public void update(PluginCall call) {
-        WidgetData.save(getContext(), call.getData().toString());
+        JSObject data = call.getData();
+        JSONObject art = data.optJSONObject("art");
+        if (art != null) {
+            // A new theme look: save its images, keep only its description with the data.
+            data.remove("art");
+            try {
+                data.put("artMeta", WidgetArt.save(getContext(), art));
+            } catch (Exception e) {
+                // The widgets fall back to their plain look.
+            }
+        } else {
+            // Same look as before: carry its description over.
+            WidgetData previous = WidgetData.load(getContext());
+            JSONObject meta = WidgetArt.meta(previous);
+            if (meta != null && meta.optString("id").equals(data.optString("artId", ""))) data.put("artMeta", meta);
+        }
+        WidgetData.save(getContext(), data.toString());
         Widgets.renderAll(getContext());
         call.resolve();
     }

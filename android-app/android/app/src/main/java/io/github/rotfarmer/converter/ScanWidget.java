@@ -34,16 +34,19 @@ public class ScanWidget extends AppWidgetProvider {
 
     static RemoteViews build(Context context, AppWidgetManager manager, int widgetId, WidgetData data) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_scan);
-        Widgets.paintFrame(views, data);
+        Widgets.paintFrame(context, views, data, manager, widgetId, 250, 190);
         views.setOnClickPendingIntent(R.id.widget_root, Widgets.openCamera(context));
         views.setOnClickPendingIntent(R.id.updated, Widgets.refresh(context));
-        views.setTextViewText(R.id.updated, Widgets.updatedText(data));
+        views.setTextViewText(R.id.updated, Widgets.text(data, Widgets.updatedText(data)));
 
         int text = Widgets.color(data, "text", 0xFFCFE3D3);
         int accent = Widgets.color(data, "accent", 0xFF7DFF72);
         int dim = Widgets.color(data, "dim", 0xFF6F8A76);
         views.setInt(R.id.scan_button_bg, "setColorFilter", accent);
         views.setInt(R.id.scan_icon, "setColorFilter", accent);
+        views.setTextViewText(R.id.scan_label, Widgets.text(data, context.getString(R.string.scan_button)));
+        views.setTextViewText(R.id.scan_hint, Widgets.text(data, context.getString(R.string.scan_button_hint)));
+        views.setTextViewText(R.id.scan_empty, Widgets.text(data, context.getString(R.string.scan_empty)));
         views.setTextColor(R.id.scan_label, accent);
         views.setTextColor(R.id.scan_hint, dim);
         views.setTextColor(R.id.last_title, dim);
@@ -51,8 +54,8 @@ public class ScanWidget extends AppWidgetProvider {
 
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
         String label = place == null ? null : place.label();
-        views.setTextViewText(R.id.title, label != null ? label.toUpperCase(Locale.getDefault()) : context.getString(R.string.scan_title));
-        views.setTextViewText(R.id.pair, place == null ? "" : place.code + " → " + (data == null ? "" : data.home()));
+        views.setTextViewText(R.id.title, Widgets.text(data, label != null ? label.toUpperCase(Locale.getDefault()) : context.getString(R.string.scan_title)));
+        views.setTextViewText(R.id.pair, Widgets.text(data, place == null ? "" : place.code + " → " + (data == null ? "" : data.home())));
 
         // The last scan's prices, as many as fit under the button.
         JSONObject last = data == null ? null : data.json.optJSONObject("lastScan");
@@ -66,7 +69,7 @@ public class ScanWidget extends AppWidgetProvider {
         if (hasItems) {
             long at = last.optLong("at", 0);
             String age = at > 0 ? " · " + DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS) : "";
-            views.setTextViewText(R.id.last_title, context.getString(R.string.scan_last) + age.toUpperCase(Locale.getDefault()));
+            views.setTextViewText(R.id.last_title, Widgets.text(data, context.getString(R.string.scan_last) + age.toUpperCase(Locale.getDefault())));
         }
         String home = data == null ? null : data.home();
         for (int i = 0; i < ROWS.length; i++) {
@@ -81,8 +84,8 @@ public class ScanWidget extends AppWidgetProvider {
             String value = data.formatAmount(amount, code);
             if (!code.equals(home)) value += " → " + data.formatResult(data.convert(amount, code, home), home);
             views.setViewVisibility(ROWS[i], View.VISIBLE);
-            views.setTextViewText(LABELS[i], name == null ? "" : name);
-            views.setTextViewText(VALUES[i], value);
+            views.setTextViewText(LABELS[i], Widgets.text(data, name == null ? "" : name));
+            views.setTextViewText(VALUES[i], Widgets.text(data, value));
             views.setTextColor(LABELS[i], text);
             views.setTextColor(VALUES[i], accent);
         }

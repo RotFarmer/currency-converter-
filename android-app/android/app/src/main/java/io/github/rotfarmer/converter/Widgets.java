@@ -6,9 +6,14 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.format.DateUtils;
+import android.text.style.TypefaceSpan;
+import android.view.View;
 import android.widget.RemoteViews;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -37,24 +42,65 @@ final class Widgets {
             manager.updateAppWidget(id, ReferenceWidget.build(context, manager, id, data));
         }
         for (int id : manager.getAppWidgetIds(new ComponentName(context, ConverterWidget.class))) {
-            manager.updateAppWidget(id, ConverterWidget.build(context, id, data));
+            manager.updateAppWidget(id, ConverterWidget.build(context, manager, id, data));
         }
         for (int id : manager.getAppWidgetIds(new ComponentName(context, ScanWidget.class))) {
             manager.updateAppWidget(id, ScanWidget.build(context, manager, id, data));
         }
     }
 
-    /** Background, border, accent marker and header text in the theme's colours. */
-    static void paintFrame(RemoteViews views, WidgetData data) {
+    /**
+     * Background, border, accent marker and header text in the theme's look. With widget art (most themes), the
+     * background is a bitmap composed at this widget's size; otherwise a rounded panel in the theme's colours.
+     */
+    static void paintFrame(Context context, RemoteViews views, WidgetData data, AppWidgetManager manager, int widgetId, int defaultWidthDp, int defaultHeightDp) {
         int bg = color(data, "bg", 0xFF040605);
         int line = color(data, "line", 0xFF2A5636);
-        views.setInt(R.id.widget_bg, "setColorFilter", bg);
-        views.setInt(R.id.widget_border, "setColorFilter", line);
+        int[] size = sizeDp(manager, widgetId, defaultWidthDp, defaultHeightDp);
+        Bitmap art = WidgetArt.frame(context, data, size[0], size[1]);
+        if (art != null) {
+            views.setImageViewBitmap(R.id.widget_bg, art);
+            views.setInt(R.id.widget_bg, "setColorFilter", 0);
+            views.setViewVisibility(R.id.widget_border, View.GONE);
+        } else {
+            views.setImageViewResource(R.id.widget_bg, R.drawable.widget_bg);
+            views.setInt(R.id.widget_bg, "setColorFilter", bg);
+            views.setViewVisibility(R.id.widget_border, View.VISIBLE);
+            views.setInt(R.id.widget_border, "setColorFilter", line);
+        }
         views.setInt(R.id.marker, "setColorFilter", color(data, "accent", 0xFF7DFF72));
         views.setInt(R.id.divider, "setColorFilter", line);
         views.setTextColor(R.id.title, color(data, "text", 0xFFCFE3D3));
         views.setTextColor(R.id.pair, color(data, "accent", 0xFF7DFF72));
         views.setTextColor(R.id.updated, color(data, "dim", 0xFF6F8A76));
+    }
+
+    /** The widget's size in dp (portrait: its width and the height the launcher gives it). */
+    static int[] sizeDp(AppWidgetManager manager, int widgetId, int defaultWidthDp, int defaultHeightDp) {
+        Bundle options = manager.getAppWidgetOptions(widgetId);
+        int w = options == null ? 0 : options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+        int h = options == null ? 0 : options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        return new int[] { w > 0 ? w : defaultWidthDp, h > 0 ? h : defaultHeightDp };
+    }
+
+    /** Text in the theme's font family (serif, monospace, casual …), when it has one. */
+    static CharSequence text(WidgetData data, CharSequence value) {
+        JSONObject meta = WidgetArt.meta(data);
+        String family = meta == null ? "" : meta.optString("font", "");
+        if (value == null || value.length() == 0 || family.isEmpty()) return value;
+        SpannableString styled = new SpannableString(value);
+        styled.setSpan(new TypefaceSpan(family), 0, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return styled;
+    }
+
+    /** The keypad's keys: square, rounded or pill-shaped as the theme likes, light or dark to suit its colours. */
+    static int keyBackground(WidgetData data) {
+        boolean dark = WidgetData.isDark(color(data, "bg", 0xFF040605));
+        JSONObject meta = WidgetArt.meta(data);
+        String shape = meta == null ? "round" : meta.optString("keys", "round");
+        if ("square".equals(shape)) return dark ? R.drawable.widget_key_dark_square : R.drawable.widget_key_light_square;
+        if ("pill".equals(shape)) return dark ? R.drawable.widget_key_dark_pill : R.drawable.widget_key_light_pill;
+        return dark ? R.drawable.widget_key_dark : R.drawable.widget_key_light;
     }
 
     static int color(WidgetData data, String key, int fallback) {

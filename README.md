@@ -62,7 +62,7 @@ On Android you can install Converter as a real app, with three home-screen widge
 
    You can also long-press the app icon and tap **Live camera**.
 
-   The widgets are drawn in your theme's colours (Iron Beetle gives them a dark forest green) and show the country at the top. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
+   The widgets take on your theme: its colours, its art (the forest and snow for Iron Beetle, a sunset grid for Vapor, lined paper for Notebook, gingham and lace for Cottage, parchment and corner flourishes for Medieval, and so on), its frame and border, a matching font and the shape of its keys. Iron Beetle's widgets are a dark forest green and show the country at the top. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
 
 Text in the app and its widgets stays the size it was designed at, whatever font size your phone is set to.
 
@@ -70,7 +70,7 @@ The app opens the same site as the web version, so changes to the app's features
 
 **Updates and the signing key.** Android only installs an update over the old app if both are signed with the same key. To give the app a permanent key, add a repository secret once: on GitHub, open the repository's **Settings → Secrets and variables → Actions → New repository secret**, name it `ANDROID_SIGNING_PASSWORD`, and give it a long password you make up. The next build creates the key, locked with that password, and saves it (encrypted) in `android-app/signing/`. Until then each build is signed with a temporary key, so to install a newer build you remove the old app first, which also clears its settings.
 
-How it's built: `android-app/` is a [Capacitor](https://capacitorjs.com) project. The widgets are native Android code in `android-app/android/app/src/main/java/` (`ConverterWidget.java`, `ReferenceWidget.java`, `ScanWidget.java`, with shared code in `Widgets.java` and `WidgetData.java`); the web app sends them data through a small plugin (`WidgetBridgePlugin.java`, called from `sendWidgetData` in `js/app.js`). Self-updating is in `Updater.java`, `UpdateReceiver.java` and `UpdateJobService.java`; each build publishes `version.json` (build number and signing-key fingerprint) next to the APK. The **Android app** GitHub Actions workflow (`.github/workflows/android.yml`) builds the APK whenever `android-app/` changes and publishes it as the `android-latest` release. You can also run it by hand from the repository's **Actions** tab.
+How it's built: `android-app/` is a [Capacitor](https://capacitorjs.com) project. The widgets are native Android code in `android-app/android/app/src/main/java/` (`ConverterWidget.java`, `ReferenceWidget.java`, `ScanWidget.java`, with shared code in `Widgets.java` and `WidgetData.java`); the web app sends them data through a small plugin (`WidgetBridgePlugin.java`, called from `sendWidgetData` in `js/app.js`). Theme art for the widgets is drawn from `js/widget-art.js` (generated, loaded only in the app): the app turns each theme's SVG art into images, and `WidgetArt.java` composes them at each widget's size. Self-updating is in `Updater.java`, `UpdateReceiver.java` and `UpdateJobService.java`; each build publishes `version.json` (build number and signing-key fingerprint) next to the APK. The **Android app** GitHub Actions workflow (`.github/workflows/android.yml`) builds the APK whenever `android-app/` changes and publishes it as the `android-latest` release. You can also run it by hand from the repository's **Actions** tab.
 
 ## Translation
 
@@ -117,6 +117,7 @@ Project layout:
 | `js/price-parser.js` | Finds prices and their currencies in recognised text |
 | `js/language.js` | Script models, language detection and language → currency |
 | `js/layout.js` | Matches each price with its item name on the photo |
+| `js/widget-art.js` | The widgets' art and frame for each theme (generated; loaded only in the Android app) |
 | `js/translate.js` | Translation (on-device or MyMemory) |
 | `js/rates.js` | Downloads and caches exchange rates |
 | `js/theme.js` | The theme list, and the colour set for a custom HUD accent colour (dark and light) |

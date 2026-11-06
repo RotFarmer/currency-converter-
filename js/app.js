@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v24'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v25'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -135,7 +135,51 @@ function rememberScan(items, currencyFor, labelFor, at) {
   syncWidget();
 }
 
-function sendWidgetData() {
+/** The widget art for the current theme and mode (see js/widget-art.js), loaded when first needed. */
+let widgetArtTable = null;
+let lastArtSent = '';
+
+async function currentWidgetArt(accent) {
+  const skin = skinById(settings.skin).id;
+  const dark = skinById(settings.skin).mode ? skinById(settings.skin).mode === 'dark' : settings.theme === 'dark' || (settings.theme !== 'light' && darkQuery.matches);
+  const mode = dark ? 'dark' : 'light';
+  if (!widgetArtTable) {
+    try {
+      widgetArtTable = (await import('./widget-art.js')).WIDGET_ART;
+    } catch {
+      return null;
+    }
+  }
+  const spec = widgetArtTable[skin];
+  if (!spec) return null;
+  return { id: `${skin}-${mode}-${accent}`, spec, layers: spec[mode] || spec.dark || spec.light };
+}
+
+/** An SVG drawn into a PNG, or a JPEG for opaque backgrounds (base64), for Android, which can't draw SVG itself. */
+async function rasterize(svg, width, height, type = 'image/png') {
+  const image = new Image();
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  await image.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width);
+  canvas.height = Math.round(height);
+  canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL(type, 0.86).split(',')[1];
+}
+
+/** The theme's widget frame and layers as images: sent once per theme change, kept by the widgets. */
+async function widgetArtPayload(art, accent) {
+  const { spec, layers } = art;
+  const svg = (text) => text.replaceAll('{accent}', accent);
+  const out = { id: art.id, radius: spec.radius, border: spec.border, borderStyle: spec.borderStyle, font: spec.font, keys: spec.keys };
+  out.backdrop = await rasterize(svg(layers.backdrop), 480, 480, 'image/jpeg');
+  if (layers.strip) out.strip = { png: await rasterize(svg(layers.strip.svg), 800, (800 * layers.strip.h) / layers.strip.w), opacity: layers.strip.opacity, maxHeight: layers.strip.maxHeight };
+  if (layers.topper) out.topper = { png: await rasterize(svg(layers.topper.svg), layers.topper.w * 3, layers.topper.h * 3), height: layers.topper.height };
+  if (layers.corner) out.corner = { png: await rasterize(svg(layers.corner.svg), 96, 96), size: layers.corner.size };
+  return out;
+}
+
+async function sendWidgetData() {
   const rates = getRates();
   const { home } = settings;
   const css = getComputedStyle(document.documentElement);
@@ -172,12 +216,27 @@ function sendWidgetData() {
       line: color('--widget-line', '') || color('--line-strong', '#2a5636'),
     },
   };
+  // The theme's look for the widgets: art images go along only when the theme (or mode, or HUD accent) changed.
+  const art = await currentWidgetArt(data.colors.accent);
+  data.artId = art ? art.id : null;
   const json = JSON.stringify(data);
-  if (json === lastWidgetData) return;
+  if (json === lastWidgetData && data.artId === lastArtSent) return;
   lastWidgetData = json;
-  window.Capacitor.nativePromise('Widgets', 'update', data).catch(() => {
-    lastWidgetData = '';
-  });
+  if (art && art.id !== lastArtSent) {
+    try {
+      data.art = await widgetArtPayload(art, data.colors.accent);
+    } catch {
+      // The widgets keep their plain look.
+    }
+  }
+  window.Capacitor.nativePromise('Widgets', 'update', data)
+    .then(() => {
+      lastArtSent = data.artId;
+    })
+    .catch(() => {
+      lastWidgetData = '';
+      lastArtSent = '';
+    });
 }
 
 function rememberRecent(code) {

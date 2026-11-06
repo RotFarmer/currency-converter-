@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 import android.widget.RemoteViews;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -16,6 +17,7 @@ import java.util.Locale;
 public class ConverterWidget extends AppWidgetProvider {
 
     private static final String[] KEYS = { "7", "8", "9", "back", "4", "5", "6", "clear", "1", "2", "3", "swap", "0", "00", "dot" };
+    private static final String[] LABELS = { "7", "8", "9", "⌫", "4", "5", "6", "C", "1", "2", "3", "⇄", "0", "00", "." };
     private static final int[] KEY_IDS = {
         R.id.key_7, R.id.key_8, R.id.key_9, R.id.key_back,
         R.id.key_4, R.id.key_5, R.id.key_6, R.id.key_clear,
@@ -23,11 +25,19 @@ public class ConverterWidget extends AppWidgetProvider {
         R.id.key_0, R.id.key_00, R.id.key_dot,
     };
     private static final int MAX_DIGITS = 12;
+    static final int DEFAULT_WIDTH_DP = 250;
+    static final int DEFAULT_HEIGHT_DP = 300;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] widgetIds) {
         Widgets.renderAll(context);
         Widgets.refreshIfStale(context, this);
+    }
+
+    @Override
+    public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int widgetId, Bundle newOptions) {
+        // Resized: the background is drawn again at the new size.
+        manager.updateAppWidget(widgetId, build(context, manager, widgetId, WidgetData.load(context)));
     }
 
     @Override
@@ -37,51 +47,57 @@ public class ConverterWidget extends AppWidgetProvider {
         editor.apply();
     }
 
-    static RemoteViews build(Context context, int widgetId, WidgetData data) {
+    static RemoteViews build(Context context, AppWidgetManager manager, int widgetId, WidgetData data) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_converter);
-        Widgets.paintFrame(views, data);
+        Widgets.paintFrame(context, views, data, manager, widgetId, DEFAULT_WIDTH_DP, DEFAULT_HEIGHT_DP);
         views.setOnClickPendingIntent(R.id.display, Widgets.openApp(context));
         views.setOnClickPendingIntent(R.id.updated, Widgets.refresh(context));
-        views.setTextViewText(R.id.updated, Widgets.updatedText(data));
+        views.setTextViewText(R.id.updated, Widgets.text(data, Widgets.updatedText(data)));
 
         int text = Widgets.color(data, "text", 0xFFCFE3D3);
         int accent = Widgets.color(data, "accent", 0xFF7DFF72);
-        int dim = Widgets.color(data, "dim", 0xFF6F8A76);
-        int keyBackground = WidgetData.isDark(Widgets.color(data, "bg", 0xFF040605)) ? R.drawable.widget_key_dark : R.drawable.widget_key_light;
+        int keyBackground = Widgets.keyBackground(data);
         for (int i = 0; i < KEYS.length; i++) {
             views.setOnClickPendingIntent(KEY_IDS[i], Widgets.key(context, widgetId, KEYS[i]));
             views.setInt(KEY_IDS[i], "setBackgroundResource", keyBackground);
+            views.setTextViewText(KEY_IDS[i], Widgets.text(data, LABELS[i]));
             views.setTextColor(KEY_IDS[i], KEYS[i].length() > 2 ? accent : text);
         }
+        fillDisplay(context, views, widgetId, data);
+        return views;
+    }
 
+    /** The title, the currencies and the two amounts: all that changes when a key is tapped. */
+    private static void fillDisplay(Context context, RemoteViews views, int widgetId, WidgetData data) {
+        int text = Widgets.color(data, "text", 0xFFCFE3D3);
+        int accent = Widgets.color(data, "accent", 0xFF7DFF72);
+        int dim = Widgets.color(data, "dim", 0xFF6F8A76);
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
         if (place == null) {
-            views.setTextViewText(R.id.title, context.getString(R.string.converter_title));
+            views.setTextViewText(R.id.title, Widgets.text(data, context.getString(R.string.converter_title)));
             views.setTextViewText(R.id.pair, "");
             views.setTextViewText(R.id.input, "—");
             views.setTextColor(R.id.input, dim);
-            views.setTextViewText(R.id.output, context.getString(data == null ? R.string.widget_setup_short : R.string.widget_no_currency_short));
+            views.setTextViewText(R.id.output, Widgets.text(data, context.getString(data == null ? R.string.widget_setup_short : R.string.widget_no_currency_short)));
             views.setTextColor(R.id.output, dim);
-            return views;
+            return;
         }
-
         SharedPreferences prefs = WidgetData.prefs(context);
         String typed = prefs.getString("input_" + widgetId, "");
         boolean swap = prefs.getBoolean("swap_" + widgetId, false);
         String from = swap ? data.home() : place.code;
         String to = swap ? place.code : data.home();
         String label = place.label();
-        views.setTextViewText(R.id.title, label != null ? label.toUpperCase(Locale.getDefault()) : context.getString(R.string.converter_title));
-        views.setTextViewText(R.id.pair, from + " → " + to);
+        views.setTextViewText(R.id.title, Widgets.text(data, label != null ? label.toUpperCase(Locale.getDefault()) : context.getString(R.string.converter_title)));
+        views.setTextViewText(R.id.pair, Widgets.text(data, from + " → " + to));
         double value = typed.isEmpty() ? 0 : Double.parseDouble(typed);
-        views.setTextViewText(R.id.input, typed.isEmpty() ? data.format(0, from, 0) : data.formatTyped(typed, from));
+        views.setTextViewText(R.id.input, Widgets.text(data, typed.isEmpty() ? data.format(0, from, 0) : data.formatTyped(typed, from)));
         views.setTextColor(R.id.input, typed.isEmpty() ? dim : text);
-        views.setTextViewText(R.id.output, "= " + data.formatResult(data.convert(value, from, to), to));
+        views.setTextViewText(R.id.output, Widgets.text(data, "= " + data.formatResult(data.convert(value, from, to), to)));
         views.setTextColor(R.id.output, accent);
-        return views;
     }
 
-    /** A key was tapped on a converter widget. */
+    /** A key was tapped on a converter widget: only the display is redrawn, so typing stays quick. */
     static void onKey(Context context, int widgetId, String key) {
         WidgetData data = WidgetData.load(context);
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
@@ -100,7 +116,9 @@ public class ConverterWidget extends AppWidgetProvider {
             }
         }
         prefs.edit().putString("input_" + widgetId, typed).putBoolean("swap_" + widgetId, swap).apply();
-        AppWidgetManager.getInstance(context).updateAppWidget(widgetId, build(context, widgetId, data));
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_converter);
+        fillDisplay(context, views, widgetId, data);
+        AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(widgetId, views);
     }
 
     /** What's typed after pressing a key: digits, "00", the decimal point, backspace or clear. */
