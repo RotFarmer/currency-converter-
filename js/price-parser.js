@@ -29,6 +29,13 @@ const TOKEN_LIST = [
   ['KSh', 'KES'], ['Ksh', 'KES'], ['Dhs', 'AED'], ['DH', 'MAD'], ['Dh', 'MAD'],
   ['NIS', 'ILS'], ['RMB', 'CNY'], ['yen', 'JPY'], ['Yen', 'JPY'], ['YEN', 'JPY'], ['euro', 'EUR'],
   ['euros', 'EUR'], ['Euro', 'EUR'], ['EURO', 'EUR'],
+  // Written in the local script (read by the Japanese, Korean, Thai, … models)
+  ['\\', ['JPY', 'CNY']], // the Japanese model often reads ¥ as a backslash
+  ['원', 'KRW'], ['บาท', 'THB'], ['ש"ח', 'ILS'], ['ש״ח', 'ILS'], ['שח', 'ILS'], ['руб.', 'RUB'], ['руб', 'RUB'],
+  ['р.', 'RUB'], ['Р', 'RUB'], ['грн', 'UAH'], ['тг', 'KZT'], ['сом', 'KGS'], ['лв.', 'BGN'],
+  ['د.إ', 'AED'], ['ر.س', 'SAR'], ['ج.م', 'EGP'], ['جنيه', 'EGP'], ['درهم', ['AED', 'MAD']],
+  ['ريال', ['SAR', 'QAR', 'OMR', 'YER', 'IRR']], ['دينار', ['KWD', 'JOD', 'BHD', 'IQD', 'TND', 'DZD', 'LYD']],
+  ['रु', ['INR', 'NPR']],
 ];
 
 const TOKENS = TOKEN_LIST.map(([text, currencies]) => ({

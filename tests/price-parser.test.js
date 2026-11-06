@@ -91,6 +91,15 @@ test('finds several prices on one line', () => {
   assert.deepEqual(found.map((p) => p.amount), [3.2, 4.1]);
 });
 
+test('reads currency words written in local scripts', () => {
+  assert.deepEqual(simple('味噌ラーメン 1080 円', 'USD'), [{ amount: 1080, currency: 'JPY', confidence: 'high' }]);
+  assert.deepEqual(simple('醤油ラーメン \\980', 'USD'), [{ amount: 980, currency: 'JPY', confidence: 'high' }]);
+  assert.deepEqual(simple('김치찌개 9,000원', 'USD'), [{ amount: 9000, currency: 'KRW', confidence: 'high' }]);
+  assert.deepEqual(simple('ต้มยำกุ้ง 120 บาท', 'USD'), [{ amount: 120, currency: 'THB', confidence: 'high' }]);
+  assert.deepEqual(simple('חומוס ש"ח 39', 'USD'), [{ amount: 39, currency: 'ILS', confidence: 'high' }]);
+  assert.deepEqual(simple('Пельмени 420 руб.', 'USD'), [{ amount: 420, currency: 'RUB', confidence: 'high' }]);
+});
+
 test('3-decimal currencies keep their decimals', () => {
   assert.deepEqual(simple('KWD 1.250', 'USD'), [{ amount: 1.25, currency: 'KWD', confidence: 'high' }]);
 });

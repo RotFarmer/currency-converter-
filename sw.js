@@ -1,7 +1,7 @@
 // Service worker: makes the app open instantly and work offline.
 // Bump VERSION whenever app files change so phones pick up the new version.
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const APP_CACHE = `app-${VERSION}`;
 const OCR_CACHE = 'ocr-tesseract-7.0.0';
 
@@ -12,10 +12,16 @@ const APP_FILES = [
   './js/app.js',
   './js/currencies.js',
   './js/format.js',
+  './js/language.js',
+  './js/layout.js',
   './js/ocr.js',
   './js/price-parser.js',
   './js/rates.js',
+  './js/scan.js',
   './js/storage.js',
+  './js/translate.js',
+  './fonts/share-tech-mono.woff2',
+  './fonts/chakra-petch-600.woff2',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',
@@ -52,7 +58,7 @@ self.addEventListener('fetch', (event) => {
   } else if (OCR_FILES.test(request.url)) {
     event.respondWith(cacheFirst(request));
   }
-  // Everything else (exchange rates) goes straight to the network; the app caches rates itself.
+  // Everything else (exchange rates, translation) goes straight to the network.
 });
 
 // Serve the cached copy straight away and refresh it in the background.

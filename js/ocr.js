@@ -1,5 +1,6 @@
 // Reads text from photos with Tesseract.js. Everything runs on the phone; the photo is never uploaded.
-// The library (~6 MB including the English model) downloads on first use and is cached afterwards.
+// The library and English model (~6 MB) download on first use; other scripts (Japanese, Thai, …)
+// add 1–3 MB each, only when a photo needs them. Everything is cached afterwards.
 
 const TESSERACT_VERSION = '7.0.0';
 const CDN = 'https://cdn.jsdelivr.net/npm';
@@ -8,40 +9,67 @@ export const OCR_URLS = {
   library: `${CDN}/tesseract.js@${TESSERACT_VERSION}/dist/tesseract.esm.min.js`,
   workerPath: `${CDN}/tesseract.js@${TESSERACT_VERSION}/dist/worker.min.js`,
   corePath: `${CDN}/tesseract.js-core@${TESSERACT_VERSION}`,
-  langPath: `${CDN}/@tesseract.js-data/eng/4.0.0_best_int`,
+  langPath: (lang) => `${CDN}/@tesseract.js-data/${lang}/4.0.0_best_int`,
 };
 
 const MAX_SIDE = 2000; // big enough for menus, small enough to read in a few seconds
 const MIN_SIDE = 1000; // small screenshots are upscaled, which helps recognition
+const PROBE_SIDE = 1000; // smaller copy used when trying out language models
 
-let workerPromise = null;
+const workers = new Map(); // OCR model → Promise<worker>
+let libraryPromise = null;
 let progressListener = null;
 
-function getWorker() {
-  if (!workerPromise) {
-    workerPromise = (async () => {
-      const { default: Tesseract } = await import(OCR_URLS.library);
-      const worker = await Tesseract.createWorker('eng', 1 /* LSTM only: smaller, more accurate model */, {
+function loadLibrary() {
+  libraryPromise ||= import(OCR_URLS.library)
+    .then((module) => module.default)
+    .catch((error) => {
+      libraryPromise = null;
+      throw error;
+    });
+  return libraryPromise;
+}
+
+function getWorker(lang = 'eng') {
+  if (!workers.has(lang)) {
+    const promise = (async () => {
+      const Tesseract = await loadLibrary();
+      const worker = await Tesseract.createWorker(lang, 1 /* LSTM only: smaller, more accurate models */, {
         workerPath: OCR_URLS.workerPath,
         corePath: OCR_URLS.corePath,
-        langPath: OCR_URLS.langPath,
+        langPath: OCR_URLS.langPath(lang),
         logger: (message) => progressListener?.(message),
       });
       // Sparse text mode finds scattered text such as price tags and shelf labels.
       await worker.setParameters({ tessedit_pageseg_mode: '11' });
       return worker;
-    })().catch((error) => {
-      workerPromise = null; // allow a retry, e.g. once the phone is back online
-      throw error;
-    });
+    })();
+    promise.catch(() => workers.delete(lang)); // allow a retry, e.g. once the phone is back online
+    workers.set(lang, promise);
   }
-  return workerPromise;
+  return workers.get(lang);
+}
+
+/** Forget a model whose worker failed or stalled (e.g. its download broke), so it can be retried. */
+export function dropWorker(lang) {
+  const promise = workers.get(lang);
+  if (!promise) return;
+  workers.delete(lang);
+  promise.then((worker) => worker.terminate()).catch(() => {});
+}
+
+/** Free the memory used by language models that are no longer needed. */
+export async function releaseWorkers(keep = []) {
+  for (const [lang, promise] of workers) {
+    if (lang === 'eng' || keep.includes(lang)) continue;
+    workers.delete(lang);
+    promise.then((worker) => worker.terminate()).catch(() => {});
+  }
 }
 
 /** Start downloading the text reader in the background so the first scan is quicker. */
-export function preloadOcr(onProgress) {
-  if (onProgress) progressListener = onProgress;
-  return getWorker();
+export function preloadOcr() {
+  return getWorker('eng');
 }
 
 /** Draw a photo onto a canvas, applying EXIF rotation and scaling it to a size OCR handles well. */
@@ -149,22 +177,39 @@ export function enhanceForOcr(canvas, mode = 'gray') {
   return out;
 }
 
+function scaledCopy(canvas, maxSide) {
+  const scale = Math.min(1, maxSide / Math.max(canvas.width, canvas.height));
+  if (scale === 1) return canvas;
+  const out = document.createElement('canvas');
+  out.width = Math.round(canvas.width * scale);
+  out.height = Math.round(canvas.height * scale);
+  out.getContext('2d').drawImage(canvas, 0, 0, out.width, out.height);
+  return out;
+}
+
 /**
  * Recognise text in a canvas.
- * @returns {Promise<{text:string, words:{text:string,bbox:object,confidence:number}[]}[]>} lines of words
+ * @param {object} options  mode: "gray" | "threshold"; lang: Tesseract model; probe: use a small copy
+ * @returns {Promise<{text:string, bbox:object, words:{text:string,bbox:object,confidence:number}[]}[]>}
+ *   lines of words, with boxes in the canvas's own pixel coordinates
  */
-export async function readText(canvas, onProgress, { mode = 'gray' } = {}) {
+export async function readText(canvas, onProgress, { mode = 'gray', lang = 'eng', probe = false } = {}) {
   progressListener = onProgress;
   try {
-    const worker = await getWorker();
-    const { data } = await worker.recognize(enhanceForOcr(canvas, mode), {}, { blocks: true, text: false });
+    const worker = await getWorker(lang);
+    const input = scaledCopy(enhanceForOcr(canvas, mode), probe ? PROBE_SIDE : Infinity);
+    const factor = canvas.width / input.width;
+    const scale = (b) => ({ x0: b.x0 * factor, y0: b.y0 * factor, x1: b.x1 * factor, y1: b.y1 * factor });
+    const { data } = await worker.recognize(input, {}, { blocks: true, text: false });
     const lines = [];
     for (const block of data.blocks || []) {
       for (const paragraph of block.paragraphs) {
         for (const line of paragraph.lines) {
           lines.push({
-            text: line.text,
-            words: line.words.map(({ text, bbox, confidence }) => ({ text, bbox, confidence })),
+            text: line.text.trim(),
+            bbox: scale(line.bbox),
+            baseline: line.baseline ? scale(line.baseline) : null,
+            words: line.words.map(({ text, bbox, confidence }) => ({ text, bbox: scale(bbox), confidence })),
           });
         }
       }

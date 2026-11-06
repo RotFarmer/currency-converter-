@@ -4,36 +4,40 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Currency Converter</title>
-  <meta name="description" content="Convert prices to your home currency. Type them in or snap a photo of a price tag or menu.">
-  <meta name="theme-color" content="#f4f6f8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0b1015" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Convert and translate prices. Type them in or snap a photo of a price tag or menu.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#050806">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Converter">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preload" href="fonts/share-tech-mono.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/styles.css">
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <symbol id="i-convert" viewBox="0 0 24 24"><path d="M4 8h15m0 0-4-4m4 4-4 4M20 16H5m0 0 4-4m-4 4 4 4"/></symbol>
-    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.3l1.6-2.2A1.5 1.5 0 0 1 9.6 4h4.8a1.5 1.5 0 0 1 1.2.8L17.2 7h2.3A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.8" r="3.6"/></symbol>
-    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></symbol>
-    <symbol id="i-photos" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.8"/><path d="m21 15.5-5-5-9.5 9.5"/></symbol>
+    <symbol id="i-convert" viewBox="0 0 24 24"><path d="M4 8h15l-4-4M20 16H5l4 4"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><path d="M12 9.5 15 12.5 12 15.5 9 12.5z"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><path d="M13 5h4v4h-4zM7 15h4v4H7z"/></symbol>
+    <symbol id="i-photos" viewBox="0 0 24 24"><path d="M3 4h18v16H3z"/><path d="m21 15-5-5-10 10"/><path d="M8 8h2v2H8z"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
     <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
-    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="M5 5h10v10H5zM15 15l5 5"/></symbol>
   </svg>
 
   <div class="app">
     <header class="topbar">
-      <h1 id="view-title">Convert</h1>
+      <div class="title-block">
+        <span class="sys-code" id="view-code" aria-hidden="true">01</span>
+        <h1 id="view-title">Convert</h1>
+      </div>
       <button id="rates-pill" class="rates-pill" type="button" aria-label="Refresh exchange rates">
         <span class="dot" aria-hidden="true"></span><span class="label">Loading rates…</span>
       </button>
@@ -42,15 +46,14 @@
     <main>
       <!-- Convert -->
       <section class="view" data-view="convert" aria-labelledby="view-title">
-        <div class="card welcome" id="welcome" hidden>
-          <p>
-            Your default currency is <strong data-chip-text="home">USD</strong>. Everything you type or scan
-            is converted to it. Tap it below to change.
-          </p>
+        <div class="panel welcome" id="welcome" hidden>
+          <p>Default currency set to <strong data-chip-text="home">USD</strong>. Everything you type or scan is
+            converted to it. Tap it below to change.</p>
           <button type="button" class="btn btn-small btn-primary" id="welcome-ok">Got it</button>
         </div>
 
-        <div class="card converter">
+        <div class="panel converter">
+          <div class="panel-head"><span>Conversion</span><span class="rate-line" id="rate-line"></span></div>
           <div class="money-field">
             <label class="field-label" for="amount-source">Price in</label>
             <div class="field-row">
@@ -66,9 +69,7 @@
             <div class="field-sub" data-name="source"></div>
           </div>
 
-          <div class="converter-divider">
-            <span class="rate-line" id="rate-line"></span>
-          </div>
+          <div class="divider" aria-hidden="true"></div>
 
           <div class="money-field">
             <label class="field-label" for="amount-home">Your currency <span class="badge">Default</span></label>
@@ -86,25 +87,25 @@
           </div>
         </div>
 
-        <div class="card" id="reference-card">
-          <h2 class="card-title">Quick reference</h2>
+        <div class="panel">
+          <div class="panel-head"><span>Quick reference</span></div>
           <div id="reference"></div>
         </div>
       </section>
 
       <!-- Scan -->
       <section class="view" data-view="scan" hidden>
-        <div class="card scan-intro" id="scan-intro">
+        <div class="panel scan-intro" id="scan-intro">
+          <div class="panel-head"><span>Optical scan</span><span id="ocr-ready">Standby</span></div>
           <div class="scan-art" aria-hidden="true">
-            <svg viewBox="0 0 120 90">
-              <path class="frame" d="M8 26V14a6 6 0 0 1 6-6h12M94 8h12a6 6 0 0 1 6 6v12M112 64v12a6 6 0 0 1-6 6H94M26 82H14a6 6 0 0 1-6-6V64"/>
-              <rect class="tag" x="30" y="28" width="60" height="34" rx="6"/>
-              <text x="60" y="51" text-anchor="middle">€4.90</text>
+            <svg viewBox="0 0 160 100">
+              <path class="frame" d="M10 30V10h20M130 10h20v20M150 70v20h-20M30 90H10V70"/>
+              <path class="cross" d="M80 22v10M80 68v10M42 50h10M108 50h10"/>
+              <text x="80" y="57" text-anchor="middle">€4.90</text>
             </svg>
           </div>
-          <h2>Scan prices</h2>
-          <p>Take a photo of a price tag, menu or receipt. Every price is converted to
-            <strong data-chip-text="home">USD</strong>.</p>
+          <p>Photograph a price tag, menu or receipt. Prices convert to
+            <strong data-chip-text="home">USD</strong> and foreign text is translated.</p>
           <div class="scan-actions">
             <label class="btn btn-primary btn-large">
               <input type="file" accept="image/*" capture="environment" class="file-input" data-photo-input>
@@ -115,16 +116,30 @@
               <svg><use href="#i-photos"/></svg> Choose from photos
             </label>
           </div>
-          <p class="hint">Prices without a currency sign are read as
-            <button type="button" class="link-btn" data-pick="source" data-chip-text="source">EUR</button>.</p>
+          <p class="hint">Prices without a sign follow the other prices on the photo, then the text’s language,
+            then <button type="button" class="link-btn" data-pick="source" data-chip-text="source">EUR</button>.</p>
           <p class="hint ocr-status" id="ocr-status" aria-live="polite"></p>
         </div>
 
-        <div id="scan-result" hidden>
+        <div id="scan-result" class="stack" hidden>
+          <div class="panel lang-bar" id="lang-bar" aria-live="polite">
+            <div class="readout">
+              <span class="k">Lang</span>
+              <button type="button" class="v link-btn" id="lang-button">Detecting…</button>
+            </div>
+            <div class="readout readout-end">
+              <span class="k">Currency</span>
+              <span class="v" id="lang-currency">—</span>
+            </div>
+            <div class="lang-status" id="lang-status"></div>
+            <button type="button" class="btn btn-small btn-secondary" id="lang-set-local" hidden>Set as local</button>
+          </div>
+
           <div class="scan-toolbar">
             <div class="segmented" role="group" aria-label="Photo labels">
-              <button type="button" data-mode="converted" aria-pressed="true">Converted</button>
-              <button type="button" data-mode="original" aria-pressed="false">Original</button>
+              <button type="button" data-mode="converted" aria-pressed="true">Prices</button>
+              <button type="button" data-mode="text" aria-pressed="false" hidden>Text</button>
+              <button type="button" data-mode="original" aria-pressed="false">Raw</button>
             </div>
           </div>
           <div class="photo-wrap" id="photo-wrap">
@@ -138,7 +153,11 @@
               </div>
             </div>
           </div>
-          <div class="card" id="scan-summary" aria-live="polite"></div>
+          <div class="panel" id="scan-summary" aria-live="polite"></div>
+          <div class="panel" id="translation-card" hidden>
+            <div class="panel-head"><span>Translation</span><span id="translation-pair"></span></div>
+            <div id="translation-list"></div>
+          </div>
           <div class="scan-actions scan-actions-row">
             <label class="btn btn-primary">
               <input type="file" accept="image/*" capture="environment" class="file-input" data-photo-input>
@@ -154,7 +173,8 @@
 
       <!-- Settings -->
       <section class="view" data-view="settings" hidden>
-        <div class="card list">
+        <div class="panel list">
+          <div class="panel-head"><span>Currency</span></div>
           <button type="button" class="list-row" data-pick="home">
             <span class="row-text"><span class="row-label">Default currency</span>
               <span class="row-hint">Everything is converted to this</span></span>
@@ -169,14 +189,34 @@
           </button>
           <label class="list-row">
             <span class="row-text"><span class="row-label">Detect currency signs</span>
-              <span class="row-hint">Use €, £, ¥, $ and codes like USD found in photos</span></span>
+              <span class="row-hint">Use €, £, ¥, $, 円, ₪ and codes like USD found in photos</span></span>
             <input type="checkbox" class="switch" id="detect-toggle" role="switch">
           </label>
         </div>
 
-        <div class="card list">
+        <div class="panel list">
+          <div class="panel-head"><span>Language</span></div>
+          <label class="list-row">
+            <span class="row-text"><span class="row-label">Guess currency from language</span>
+              <span class="row-hint">Japanese text → JPY, Thai → THB, Hebrew → ILS</span></span>
+            <input type="checkbox" class="switch" id="guess-toggle" role="switch">
+          </label>
+          <label class="list-row">
+            <span class="row-text"><span class="row-label">Translate text in photos</span>
+              <span class="row-hint">Sends the recognised text (never the photo) to the MyMemory translator</span></span>
+            <input type="checkbox" class="switch" id="translate-toggle" role="switch">
+          </label>
+          <button type="button" class="list-row" id="translate-to">
+            <span class="row-text"><span class="row-label">Translate to</span></span>
+            <span class="row-value" id="translate-to-value"></span>
+            <svg class="row-chevron"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+
+        <div class="panel list">
+          <div class="panel-head"><span>Exchange rates</span></div>
           <div class="list-row static">
-            <span class="row-text"><span class="row-label">Exchange rates</span>
+            <span class="row-text"><span class="row-label">Last update</span>
               <span class="row-hint" id="rates-detail">Not downloaded yet</span></span>
           </div>
           <button type="button" class="list-row" id="refresh-rates">
@@ -185,21 +225,25 @@
           </button>
         </div>
 
-        <div class="card list" id="install-card" hidden>
+        <div class="panel list" id="install-card" hidden>
+          <div class="panel-head"><span>Install</span></div>
           <div class="list-row static">
-            <span class="row-text"><span class="row-label">Install the app</span>
-              <span class="row-hint" id="install-hint">Add it to your home screen for one-tap access and offline use.</span></span>
+            <span class="row-text"><span class="row-label">Add to home screen</span>
+              <span class="row-hint" id="install-hint">One-tap access and offline use.</span></span>
           </div>
           <button type="button" class="list-row" id="install-btn" hidden>
-            <span class="row-text"><span class="row-label accent">Add to home screen</span></span>
+            <span class="row-text"><span class="row-label accent">Install now</span></span>
             <svg class="row-chevron"><use href="#i-chevron"/></svg>
           </button>
         </div>
 
         <p class="footnote">
-          Rates from <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">ExchangeRate-API</a>,
-          updated daily. They are mid-market rates; banks and card providers may add fees.
-          Text in photos is read on your phone with Tesseract.js. Photos are never uploaded.
+          Rates: <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">ExchangeRate-API</a>,
+          updated daily, mid-market (banks and card providers may add fees).
+          Text is read on your phone with Tesseract.js and photos are never uploaded.
+          Translation: on-device where the browser supports it, otherwise
+          <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>
+          (free, about 5,000 characters a day).
         </p>
       </section>
     </main>
@@ -211,17 +255,17 @@
     </nav>
   </div>
 
-  <!-- Currency picker -->
+  <!-- Picker (currencies and languages) -->
   <div class="sheet-backdrop" id="picker" hidden>
     <div class="sheet sheet-full" role="dialog" aria-modal="true" aria-labelledby="picker-title">
       <div class="sheet-header">
-        <h2 id="picker-title">Choose currency</h2>
+        <h2 id="picker-title">Select</h2>
         <button type="button" class="icon-btn" data-close aria-label="Close"><svg><use href="#i-close"/></svg></button>
       </div>
       <div class="search-wrap">
         <svg aria-hidden="true"><use href="#i-search"/></svg>
-        <input type="search" id="picker-search" placeholder="Search currency or country" autocomplete="off"
-               autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search currencies">
+        <input type="search" id="picker-search" placeholder="Search" autocomplete="off"
+               autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search">
       </div>
       <div class="picker-list" id="picker-list" role="listbox" aria-labelledby="picker-title"></div>
     </div>

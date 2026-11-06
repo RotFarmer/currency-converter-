@@ -1,16 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Transparent background; the symbols are hollow green outlines. -->
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1bb890"/>
-      <stop offset="1" stop-color="#0a5c49"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-    <path stroke-width="26" opacity="0.92" d="M118 196v-46a32 32 0 0 1 32-32h46M316 118h46a32 32 0 0 1 32 32v46M394 316v46a32 32 0 0 1-32 32h-46M196 394h-46a32 32 0 0 1-32-32v-46"/>
-    <g stroke-width="9" transform="translate(256 256) scale(2.15) translate(-50 -50.5)">
-      <path d="M64 36.5c-3-5-9-8-16-8-9 0-15 5-15 12 0 16 34 9 34 25 0 8-7 12.5-16 12.5-8 0-14-3-17-9"/>
-      <path d="M49.5 19v63"/>
+    <g id="shape" fill="none" stroke-linecap="square" stroke-linejoin="miter">
+      <path d="M92 196V92h104M316 92h104v104M420 316v104H316M196 420H92V316"/>
+      <path d="M326 186H214l-28 28v26l28 28h84l28 28v26l-28 28H186"/>
+      <path d="M256 140v46M256 350v46"/>
     </g>
-  </g>
+    <mask id="hollow" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <use href="#shape" stroke="#000" stroke-width="12"/>
+    </mask>
+  </defs>
+  <use href="#shape" stroke="#7dff72" stroke-width="36" mask="url(#hollow)"/>
 </svg>

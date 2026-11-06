@@ -1,4 +1,4 @@
-// Currency metadata: names, flags, decimals and a sensible default for the user's region.
+// Currency metadata: names, symbols, decimals and a sensible default for the user's region.
 
 const DATA = `
 AED United Arab Emirates Dirham
@@ -170,12 +170,19 @@ try {
   /* older browsers: search falls back to names and codes */
 }
 
-function flagFor(region) {
-  if (!region || region === '-') return '🌐';
-  return String.fromCodePoint(...[...region].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+/** Short symbol for a currency: "$", "€", "¥", "₪" — or the code when there isn't one. */
+function symbolFor(code) {
+  try {
+    const part = new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0)
+      .find((p) => p.type === 'currency');
+    return part?.value || code;
+  } catch {
+    return code;
+  }
 }
 
-function normalize(text) {
+export function normalize(text) {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
@@ -196,7 +203,7 @@ export const CURRENCIES = DATA.trim()
     return {
       code,
       name,
-      flag: flagFor(region),
+      symbol: symbolFor(code),
       search: normalize(`${code} ${name} ${country} ${keywords}`),
     };
   });
@@ -205,7 +212,7 @@ const BY_CODE = new Map(CURRENCIES.map((c) => [c.code, c]));
 export const CURRENCY_CODES = new Set(BY_CODE.keys());
 
 export function getCurrency(code) {
-  return BY_CODE.get(code) || { code, name: code, flag: '🌐', search: normalize(code) };
+  return BY_CODE.get(code) || { code, name: code, symbol: code, search: normalize(code) };
 }
 
 const digitsCache = new Map();

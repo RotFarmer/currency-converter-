@@ -1,12 +1,14 @@
 # Currency Converter
 
-A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it.
+A currency converter for your phone, with a dark, minimal mech-HUD look. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
 
 - **Default currency.** Pick your home currency and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **Scan prices with the camera.** Take a photo of a price tag, menu or receipt. Each price is found and covered with its converted amount, right on the photo. Tap a price to fix a misread number or change its currency.
-- **Understands currency signs.** It recognises €, £, ¥, $, ₪, ₹, kr, zł, codes like `USD` or `CHF`, and formats like `1.280,50 €` or `12.-`. Ambiguous signs follow your "Prices in" currency, so `$` means CAD in Canada and `¥` means CNY in China. Numbers with no sign are read in your "Prices in" currency.
-- **Works offline.** Install it to your home screen. Exchange rates are saved on the phone, and the text reader is cached after its first download.
-- **Private.** Text is read on the phone itself with [Tesseract.js](https://github.com/naptha/tesseract.js). Photos are never uploaded.
+- **Translates what it reads.** Menu items and signs are translated into your language. The **Text** view lays the translations over the photo, each price in the list shows its translated item name, and a list of every line is shown below the photo.
+- **Works out the currency from the language.** Japanese text means yen, Thai means baht, Hebrew means shekels, and so on. It reads Latin-alphabet languages plus Japanese, Chinese, Korean, Thai, Hebrew, Arabic, Russian/Ukrainian, Greek and Hindi. If it guesses the language wrong, tap **LANG** to pick it.
+- **Understands currency signs.** It recognises €, £, ¥, $, ₪, ₹, kr, zł, 円, 원, บาท, ש״ח, руб, codes like `USD` or `CHF`, and formats like `1.280,50 €` or `12.-`. A price without a sign uses the currency most other prices on the same photo show, then the language's currency, then your "Prices in" setting.
+- **Works offline.** Install it to your home screen. Exchange rates are saved on the phone, and the text reader is cached after its first download. Translation needs a connection.
+- **Private.** Text is read on the phone itself with [Tesseract.js](https://github.com/naptha/tesseract.js). Photos are never uploaded. For translation, only the recognised text is sent to the translator.
 
 It's a web app (PWA), so it runs on iPhone and Android with no app store and no build step.
 
@@ -15,11 +17,17 @@ It's a web app (PWA), so it runs on iPhone and Android with no app store and no 
 1. Open the app's web address in Safari (iPhone) or Chrome (Android).
 2. Install it:
    - **iPhone:** tap the Share button, then **Add to Home Screen**.
-   - **Android:** tap **Add to home screen** in Settings inside the app, or use Chrome's menu.
+   - **Android:** tap **Install now** in Settings inside the app, or use Chrome's menu.
 3. Choose your **default currency** and the currency **prices are in** (the local currency where you are).
 4. Type an amount on the **Convert** tab, or open **Scan** and take a photo.
 
-Tips for scanning: get close enough that prices fill a good part of the photo, hold steady and use decent light. The first scan downloads the text reader (about 6 MB). After that it works offline.
+Tips for scanning: get close enough that prices fill a good part of the photo, hold steady and use decent light. The first scan downloads the text reader (about 6 MB). A photo in a non-Latin script also downloads that script's model (1–3 MB) the first time.
+
+Settings → Language has switches for translation and for guessing the currency from the language, and lets you pick the language to translate into.
+
+## Translation
+
+Translation runs on the phone where the browser offers a built-in translator (recent desktop Chrome). Otherwise it uses [MyMemory](https://mymemory.translated.net)'s free API, which needs no account. It allows roughly 5,000 characters a day per device, about a dozen menus. Past that, translation pauses until the next day; prices and currency detection keep working.
 
 ## Hosting it
 
@@ -45,17 +53,30 @@ Project layout:
 
 | Path | What it does |
 | --- | --- |
-| `index.html`, `css/styles.css` | Page structure and styles (light and dark mode) |
+| `index.html`, `css/styles.css` | Page structure and the HUD theme |
 | `js/app.js` | Screens, settings and user interaction |
-| `js/price-parser.js` | Finds prices and their currencies in recognised text |
+| `js/scan.js` | Photo pipeline: prices, language identification, re-reading in the right script |
 | `js/ocr.js` | Prepares photos and runs Tesseract.js (loaded on demand from jsDelivr) |
+| `js/price-parser.js` | Finds prices and their currencies in recognised text |
+| `js/language.js` | Script models, language detection and language → currency |
+| `js/layout.js` | Matches each price with its item name on the photo |
+| `js/translate.js` | Translation (on-device or MyMemory) |
 | `js/rates.js` | Downloads and caches exchange rates |
-| `js/currencies.js` | Currency names, flags and decimals |
+| `js/currencies.js` | Currency names, symbols and decimals |
 | `js/format.js` | Number formatting and parsing |
 | `sw.js` | Service worker for offline use |
+| `fonts/` | Share Tech Mono and Chakra Petch (SIL Open Font License) |
 | `tests/` | Unit tests (`node --test`) |
 
 When you change any app file, bump `VERSION` in `sw.js` so installed copies pick up the update.
+
+### How the language is identified
+
+The English text model reads digits and common currency signs in any photo, so prices come from it first. Text in another script comes out of that model as low-confidence nonsense. When that happens, the app tries the script models on a small copy of the photo, starting with the likeliest (from currency signs it saw and your "Prices in" setting), and keeps the one that reads the text best. It then reads the photo again with that model, which also picks up local currency words like 円. Latin-alphabet languages are identified from common words and accented letters.
+
+## Icons
+
+`icons/icon.svg` is the source: hollow green outlines on a transparent background. The PNGs are transparent too, except the Android "maskable" icon, which has a black background because Android crops home-screen icons into its own shape. iPhones show transparent home-screen icons on black.
 
 ## Exchange rates
 

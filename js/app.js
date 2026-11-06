@@ -1,21 +1,42 @@
-import { CURRENCIES, CURRENCY_CODES, getCurrency, fractionDigits, searchCurrencies, guessHomeCurrency } from './currencies.js';
+import {
+  CURRENCIES,
+  CURRENCY_CODES,
+  getCurrency,
+  fractionDigits,
+  searchCurrencies,
+  guessHomeCurrency,
+  normalize,
+} from './currencies.js';
 import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
-import { photoToCanvas, preloadOcr, readText } from './ocr.js';
+import { photoToCanvas, preloadOcr } from './ocr.js';
+import { readPrices, identifyLanguage, readInLanguage, mergePrices } from './scan.js';
+import { textLines, labelFor } from './layout.js';
+import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
+import { translateLines } from './translate.js';
 import { load, save } from './storage.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const escapeHtml = (text) =>
   String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const baseLanguage = (code) => String(code || '').split('-')[0];
 
 /* ---------- Settings ---------- */
+
+function defaultTargetLanguage() {
+  const lang = baseLanguage(navigator.language).toLowerCase();
+  return TARGET_LANGUAGES.includes(lang) ? lang : 'en';
+}
 
 const settings = {
   home: null, // the default currency everything is converted to
   source: null, // the currency prices are in ("prices in")
   detectCurrency: true,
+  guessCurrency: true, // use the language of a photo's text to pick its currency
+  translate: true,
+  translateTo: defaultTargetLanguage(),
   recent: [],
   welcomed: false,
   ...load('settings', {}),
@@ -69,35 +90,34 @@ function renderRatesStatus() {
   let label;
   if (!rates) {
     state = ratesLoading ? 'loading' : 'error';
-    label = ratesLoading ? 'Loading rates…' : 'No rates · tap to retry';
+    label = ratesLoading ? 'Loading rates…' : 'No rates · retry';
   } else if (ratesLoading) {
     state = 'loading';
     label = 'Updating…';
   } else {
     state = ratesFailed || ratesAreStale() ? 'old' : 'ok';
-    label = `${ratesFailed ? 'Offline' : 'Updated'} ${timeAgo(rates.updatedAt)}`;
+    label = `${ratesFailed ? 'Offline' : 'Rates'} ${timeAgo(rates.updatedAt)}`;
   }
   pill.dataset.state = state;
   $('.label', pill).textContent = label;
-  $('#rates-detail').textContent = rates
-    ? `${formatDateTime(rates.updatedAt)} · ${rates.provider}`
-    : 'Not downloaded yet';
+  $('#rates-detail').textContent = rates ? `${formatDateTime(rates.updatedAt)} · ${rates.provider}` : 'Not downloaded yet';
 }
 
 /* ---------- Tabs ---------- */
 
-const TITLES = { convert: 'Convert', scan: 'Scan', settings: 'Settings' };
+const TABS = { convert: ['Convert', '01'], scan: ['Scan', '02'], settings: ['Settings', '03'] };
 let currentTab = 'convert';
 
 function showTab(tab) {
   if (tab !== currentTab) window.scrollTo(0, 0);
   currentTab = tab;
-  for (const view of $$('.view')) view.hidden = view.dataset.view !== tab;
+  for (const view of $$('.view[data-view]')) view.hidden = view.dataset.view !== tab;
   for (const button of $$('.tabbar button')) {
     if (button.dataset.tab === tab) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   }
-  $('#view-title').textContent = TITLES[tab];
+  $('#view-title').textContent = TABS[tab][0];
+  $('#view-code').textContent = TABS[tab][1];
   if (tab === 'scan') warmUpOcr();
 }
 
@@ -134,22 +154,56 @@ window.addEventListener('popstate', () => {
   if (top) closeSheet(top, { fromHistory: true });
 });
 
-/* ---------- Currency picker ---------- */
+/* ---------- Picker (currencies and languages) ---------- */
 
 const picker = $('#picker');
 const pickerSearch = $('#picker-search');
 const pickerList = $('#picker-list');
 let pickerState = null;
 
-function availableCurrencies() {
-  const rates = getRates();
-  return rates ? CURRENCIES.filter((c) => rates.rates[c.code]) : CURRENCIES;
+function symbolGlyph(currency) {
+  // Codes without a short symbol (CHF, AED) get the generic currency sign.
+  return currency.symbol === currency.code || currency.symbol.length > 3 ? '¤' : currency.symbol;
 }
 
-function openPicker({ title, selected, onSelect }) {
-  pickerState = { selected, onSelect };
+function currencyItems() {
+  const rates = getRates();
+  return CURRENCIES.filter((c) => !rates || rates.rates[c.code]).map((c) => ({
+    code: c.code,
+    glyph: symbolGlyph(c),
+    title: c.code,
+    sub: c.name,
+    search: c.search,
+  }));
+}
+
+function nativeLanguageName(code) {
+  try {
+    return new Intl.DisplayNames([code], { type: 'language' }).of(code) || '';
+  } catch {
+    return '';
+  }
+}
+
+function languageItems(codes) {
+  return codes.map((code) => {
+    const name = code === 'auto' ? 'Auto-detect' : languageName(code);
+    const native = code === 'auto' ? 'From the photo' : nativeLanguageName(code);
+    return {
+      code,
+      glyph: code === 'auto' ? '◎' : code.slice(0, 2).toUpperCase(),
+      title: name,
+      sub: native !== name ? native : '',
+      search: normalize(`${code} ${name} ${native}`),
+    };
+  });
+}
+
+function openPicker({ title, items, selected, onSelect, recent = [], placeholder = 'Search' }) {
+  pickerState = { items, selected, onSelect, recent };
   $('#picker-title').textContent = title;
   pickerSearch.value = '';
+  pickerSearch.placeholder = placeholder;
   renderPickerList();
   openSheet(picker);
   pickerList.scrollTop = 0;
@@ -158,24 +212,22 @@ function openPicker({ title, selected, onSelect }) {
 
 function renderPickerList() {
   const query = pickerSearch.value.trim();
-  const list = searchCurrencies(query, availableCurrencies());
-  const { selected } = pickerState;
-  const row = (c) => `
-    <button type="button" class="picker-row" role="option" aria-selected="${c.code === selected}" data-code="${c.code}">
-      <span class="flag" aria-hidden="true">${c.flag}</span>
-      <span class="code">${c.code}</span>
-      <span class="name">${escapeHtml(c.name)}</span>
-      ${c.code === selected ? '<svg aria-hidden="true"><use href="#i-check"/></svg>' : ''}
+  const { items, selected, recent } = pickerState;
+  const list = searchCurrencies(query, items);
+  const row = (item) => `
+    <button type="button" class="picker-row" role="option" aria-selected="${item.code === selected}" data-code="${escapeHtml(item.code)}">
+      <span class="sym${item.glyph.length > 2 ? ' long' : ''}" aria-hidden="true">${escapeHtml(item.glyph)}</span>
+      <span class="title">${escapeHtml(item.title)}</span>
+      <span class="sub">${escapeHtml(item.sub)}</span>
+      ${item.code === selected ? '<svg aria-hidden="true"><use href="#i-check"/></svg>' : ''}
     </button>`;
   let html = '';
-  if (!query) {
-    const recent = settings.recent.filter((code) => list.some((c) => c.code === code)).map(getCurrency);
-    if (recent.length) html += `<div class="picker-section">Recent</div>${recent.map(row).join('')}`;
-    html += '<div class="picker-section">All currencies</div>';
+  if (!query && recent.length) {
+    const recentItems = recent.map((code) => items.find((i) => i.code === code)).filter(Boolean);
+    if (recentItems.length) html += `<div class="picker-section">Recent</div>${recentItems.map(row).join('')}`;
+    html += '<div class="picker-section">All</div>';
   }
-  html += list.length
-    ? list.map(row).join('')
-    : `<div class="picker-empty">No currency matches “${escapeHtml(query)}”</div>`;
+  html += list.length ? list.map(row).join('') : `<div class="picker-empty">No match for “${escapeHtml(query)}”</div>`;
   pickerList.innerHTML = html;
 }
 
@@ -194,7 +246,10 @@ document.addEventListener('click', (event) => {
   const role = trigger.dataset.pick;
   openPicker({
     title: role === 'home' ? 'Default currency' : 'Prices are in',
+    items: currencyItems(),
     selected: settings[role],
+    recent: settings.recent,
+    placeholder: 'Search currency or country',
     onSelect: (code) => setCurrency(role, code),
   });
 });
@@ -204,18 +259,14 @@ document.addEventListener('click', (event) => {
 const inputs = { source: $('#amount-source'), home: $('#amount-home') };
 const converter = { side: 'source', value: null }; // the side the user last typed in
 
-function otherSide(side) {
-  return side === 'source' ? 'home' : 'source';
-}
-
 function fitInput(input) {
   const length = input.value.length;
-  input.style.fontSize = length > 13 ? '22px' : length > 9 ? '27px' : '';
+  input.style.fontSize = length > 13 ? '22px' : length > 9 ? '28px' : '';
 }
 
 function renderConverterValues() {
   const { side, value } = converter;
-  const other = otherSide(side);
+  const other = side === 'source' ? 'home' : 'source';
   const result = value == null ? null : convert(value, settings[side], settings[other]);
   inputs[other].value = formatInputNumber(result, settings[other]);
   for (const [name, input] of Object.entries(inputs)) {
@@ -230,10 +281,10 @@ function renderRateLine() {
   const rate = convert(1, source, home);
   const el = $('#rate-line');
   if (rate == null) {
-    el.textContent = 'Waiting for exchange rates…';
+    el.textContent = 'Awaiting rates';
     return;
   }
-  // Show "100 JPY = 0.65 USD" rather than "1 JPY = 0.0065 USD".
+  // Show "100 JPY = 0.6557 USD" rather than "1 JPY = 0.0065 USD".
   const units = 10 ** Math.max(0, Math.round(-Math.log10(rate)));
   el.textContent = `${units.toLocaleString()} ${source} = ${formatRate(rate * units)} ${home}`;
 }
@@ -288,7 +339,25 @@ $('#welcome-ok').addEventListener('click', () => {
 
 const photo = $('#photo');
 const photoWrap = $('#photo-wrap');
-const scan = { status: 'idle', items: [], mode: 'converted', run: 0, hasPhoto: false, error: null };
+const scan = {
+  status: 'idle', // idle | reading | done | error
+  run: 0,
+  hasPhoto: false,
+  error: null,
+  mode: 'converted', // converted | text | original
+  englishLines: [],
+  englishPrices: [],
+  items: [],
+  edited: false, // the user changed a price, so later passes must not replace the list
+  lines: [], // text lines (prices removed) used for item names and translation
+  language: null,
+  langRun: 0,
+  langStatus: 'idle', // idle | detecting | done | none | failed
+  langProgress: '',
+  translations: null, // Map of line text → translation
+  translateStatus: 'idle', // idle | busy | done | same | off | failed
+  translateError: '',
+};
 let ocrWarm = false;
 
 const OCR_STEPS = {
@@ -303,13 +372,17 @@ function warmUpOcr() {
   if (ocrWarm) return;
   ocrWarm = true;
   const status = $('#ocr-status');
+  const ready = $('#ocr-ready');
+  ready.textContent = 'Loading';
   status.textContent = 'Getting the text reader ready…';
   preloadOcr()
     .then(() => {
+      ready.textContent = 'Ready';
       status.textContent = '';
     })
     .catch(() => {
       ocrWarm = false;
+      ready.textContent = 'Offline';
       status.textContent = 'The text reader downloads the first time you scan (about 6 MB).';
     });
 }
@@ -319,10 +392,84 @@ function setProgress(text, progress) {
   $('#scan-progress-bar').style.width = `${Math.round((progress || 0) * 100)}%`;
 }
 
+function parseOptions() {
+  return {
+    source: settings.source,
+    detectCurrency: settings.detectCurrency,
+    knownCodes: CURRENCY_CODES,
+    decimalsFor: fractionDigits,
+  };
+}
+
+/** The currency suggested by the language of the photo's text, if any. */
+function languageCurrency() {
+  return settings.guessCurrency && scan.language ? currencyForLanguage(scan.language, settings.source) : null;
+}
+
+/** How ambiguous signs ($, ¥, kr) are read: the language's currency, else the user's setting. */
+function signBase() {
+  return languageCurrency() || settings.source;
+}
+
+/** The currency a detected sign stands for on this photo. */
+function resolveSign(candidates) {
+  const base = signBase();
+  // ₩ and ¥ look alike; on a Korean menu a "¥" is almost certainly a misread won sign.
+  if (base === 'KRW' && candidates.includes('JPY')) return 'KRW';
+  return resolveCurrency(candidates, base);
+}
+
+/**
+ * The currency for prices without a sign, and why: the currency most signed prices on the
+ * same photo use ("signs"), else the text's language ("language"), else the setting.
+ */
+function photoCurrency() {
+  if (settings.detectCurrency) {
+    const counts = new Map();
+    for (const item of scan.items) {
+      if (!item.candidates || item.fixedCurrency) continue;
+      const code = resolveSign(item.candidates);
+      counts.set(code, (counts.get(code) || 0) + 1);
+    }
+    const total = [...counts.values()].reduce((sum, n) => sum + n, 0);
+    for (const [code, n] of counts) if (n / total >= 0.6) return { code, reason: 'signs' };
+  }
+  const fromLanguage = languageCurrency();
+  return fromLanguage ? { code: fromLanguage, reason: 'language' } : { code: settings.source, reason: 'setting' };
+}
+
 function currencyOf(item) {
   if (item.fixedCurrency) return item.fixedCurrency;
-  if (item.candidates && settings.detectCurrency) return resolveCurrency(item.candidates, settings.source);
-  return settings.source;
+  if (item.candidates && settings.detectCurrency) return resolveSign(item.candidates);
+  return photoCurrency().code;
+}
+
+function setItems(prices) {
+  scan.items = prices.map((p, index) => ({
+    id: index + 1,
+    amount: p.amount,
+    candidates: p.candidates,
+    fixedCurrency: null,
+    text: p.text,
+    bbox: p.bbox,
+    confidence: p.confidence,
+    label: null,
+    labelLines: [],
+  }));
+}
+
+function assignLabels() {
+  const rtl = isRtl(scan.language);
+  for (const item of scan.items) {
+    item.labelLines = labelFor(item.bbox, scan.lines, { rtl }).map((line) => line.text);
+    item.label = item.labelLines.join(' ') || null;
+  }
+}
+
+/** An item's name in the translation language, or null if there is no translation. */
+function translatedLabel(item) {
+  if (!scan.translations || !item.labelLines?.length) return null;
+  return item.labelLines.map((text) => scan.translations.get(text) || text).join(' ');
 }
 
 async function handlePhoto(file) {
@@ -345,47 +492,32 @@ async function handlePhoto(file) {
   await recognise(run);
 }
 
-function parsePrices(lines) {
-  return findPrices(lines, {
-    source: settings.source,
-    detectCurrency: settings.detectCurrency,
-    knownCodes: CURRENCY_CODES,
-    decimalsFor: fractionDigits,
-  });
-}
-
 async function recognise(run) {
-  scan.status = 'reading';
+  Object.assign(scan, {
+    status: 'reading',
+    items: [],
+    englishLines: [],
+    englishPrices: [],
+    lines: [],
+    edited: false,
+    language: null,
+    langStatus: 'idle',
+    translations: null,
+    translateStatus: 'idle',
+  });
   renderScan();
   try {
-    let prices = parsePrices(
-      await readText(photo, ({ status, progress }) => {
-        if (run === scan.run) setProgress(OCR_STEPS[status] || 'Getting ready…', progress);
-      })
-    );
-    if (run !== scan.run) return;
-    if (!prices.length) {
-      // Second attempt with a black-and-white version, which copes better with shadows and glare.
-      prices = parsePrices(
-        await readText(
-          photo,
-          ({ status, progress }) => {
-            if (run === scan.run && status === 'recognizing text') setProgress('Looking more closely…', progress);
-          },
-          { mode: 'threshold' }
-        )
-      );
+    const { lines, prices } = await readPrices(photo, parseOptions(), ({ status, progress }, retry) => {
       if (run !== scan.run) return;
-    }
-    scan.items = prices.map((p, index) => ({
-      id: index + 1,
-      amount: p.amount,
-      candidates: p.candidates,
-      fixedCurrency: null,
-      text: p.text,
-      bbox: p.bbox,
-      confidence: p.confidence,
-    }));
+      if (!retry) setProgress(OCR_STEPS[status] || 'Getting ready…', progress);
+      else if (status === 'recognizing text') setProgress('Looking more closely…', progress);
+    });
+    if (run !== scan.run) return;
+    scan.englishLines = lines;
+    scan.englishPrices = prices;
+    setItems(prices);
+    scan.lines = textLines(lines, prices.map((p) => p.bbox));
+    assignLabels();
     scan.status = 'done';
     ocrWarm = true;
     $('#ocr-status').textContent = '';
@@ -394,6 +526,85 @@ async function recognise(run) {
     console.error(error);
     scan.status = 'error';
     scan.error = error;
+    renderScan();
+    return;
+  }
+  renderScan();
+  analyseLanguage(run);
+}
+
+/**
+ * Work out the language (re-reading the text in its own script if needed), then translate.
+ * Runs after the prices are already on screen. `forcedLang` comes from the user's own choice.
+ */
+async function analyseLanguage(run, forcedLang = null) {
+  const langRun = ++scan.langRun;
+  const live = () => run === scan.run && langRun === scan.langRun;
+  Object.assign(scan, {
+    langStatus: 'detecting',
+    langProgress: forcedLang ? `Reading ${languageName(forcedLang)}…` : 'Identifying language…',
+    translations: null,
+    translateStatus: 'idle',
+  });
+  renderScan();
+  try {
+    let result;
+    if (forcedLang) {
+      result = await readInLanguage(photo, forcedLang, scan.englishLines);
+    } else {
+      result = await identifyLanguage(photo, scan.englishLines, {
+        hintCurrencies: [...scan.englishPrices.flatMap((p) => p.candidates || []), settings.source],
+        isCancelled: () => !live(),
+        onProbe: (index, total) => {
+          if (!live()) return;
+          scan.langProgress = `Identifying script ${index + 1}/${total}…`;
+          renderLanguageBar();
+        },
+      });
+    }
+    if (!result || !live()) return;
+    scan.language = result.lang;
+    if (!scan.edited) {
+      const scriptPrices = result.model === 'eng' ? [] : findPrices(result.lines, parseOptions());
+      setItems(mergePrices(scan.englishPrices, scriptPrices));
+    }
+    scan.lines = textLines(result.lines, scan.items.map((item) => item.bbox));
+    assignLabels();
+    scan.langStatus = result.lang ? 'done' : 'none';
+    renderScan();
+    await translateScan(live);
+  } catch (error) {
+    if (!live()) return;
+    console.error(error);
+    scan.langStatus = 'failed';
+    renderScan();
+  }
+}
+
+async function translateScan(live = () => true) {
+  const from = scan.language;
+  const to = settings.translateTo;
+  scan.translations = null;
+  if (!settings.translate) scan.translateStatus = 'off';
+  else if (!from || !scan.lines.length) scan.translateStatus = 'idle';
+  else if (baseLanguage(from) === baseLanguage(to)) scan.translateStatus = 'same';
+  else scan.translateStatus = 'busy';
+  renderScan();
+  if (scan.translateStatus !== 'busy') return;
+  try {
+    const texts = scan.lines.map((line) => line.text);
+    const translated = await translateLines(texts, from, to);
+    if (!live()) return;
+    scan.translations = new Map(texts.map((text, i) => [text, translated[i]]));
+    scan.translateStatus = 'done';
+    if (scan.mode === 'converted' && scan.translations.size) scan.mode = 'text';
+  } catch (error) {
+    if (!live()) return;
+    scan.translateStatus = 'failed';
+    const message = String(error?.message || '');
+    if (!navigator.onLine) scan.translateError = 'you’re offline';
+    else if (/fetch|network|abort|timeout/i.test(message)) scan.translateError = 'couldn’t reach the translator';
+    else scan.translateError = message || 'unknown error';
   }
   renderScan();
 }
@@ -409,30 +620,93 @@ function renderScan() {
   $('#scan-intro').hidden = scan.hasPhoto;
   $('#scan-result').hidden = !scan.hasPhoto;
   $('#scan-progress').hidden = scan.status !== 'reading';
-  photoWrap.classList.toggle('show-original', scan.mode === 'original');
+  const hasTranslation = Boolean(scan.translations?.size);
+  if (scan.mode === 'text' && !hasTranslation) scan.mode = 'converted';
+  $('[data-mode="text"]').hidden = !hasTranslation;
+  photoWrap.classList.toggle('mode-original', scan.mode === 'original');
+  photoWrap.classList.toggle('mode-text', scan.mode === 'text');
   for (const button of $$('[data-mode]')) button.setAttribute('aria-pressed', String(button.dataset.mode === scan.mode));
+  renderLanguageBar();
   renderOverlays();
   renderSummary();
+  renderTranslationCard();
+}
+
+function renderLanguageBar() {
+  const bar = $('#lang-bar');
+  bar.hidden = scan.status !== 'done';
+  if (bar.hidden) return;
+  const button = $('#lang-button');
+  const status = $('#lang-status');
+  const { code, reason } = photoCurrency();
+
+  button.textContent = scan.langStatus === 'detecting' ? 'Detecting…' : `${scan.language ? languageName(scan.language) : 'Unknown'} ▾`;
+  const why = { signs: 'from signs', language: 'from language', setting: 'your setting' }[reason];
+  $('#lang-currency').innerHTML = `${escapeHtml(code)} <span class="note">${why}</span>`;
+  $('#lang-set-local').hidden = reason === 'setting' || code === settings.source;
+
+  let text = '';
+  let state = '';
+  if (scan.langStatus === 'detecting') [text, state] = [scan.langProgress, 'busy'];
+  else if (scan.langStatus === 'failed') [text, state] = ['Couldn’t identify the language. Tap LANG to choose.', 'error'];
+  else if (scan.langStatus === 'none') text = 'Language not recognised. Tap LANG to choose.';
+  else if (scan.translateStatus === 'busy') [text, state] = [`Translating to ${languageName(settings.translateTo)}…`, 'busy'];
+  else if (scan.translateStatus === 'done') text = `Translated to ${languageName(settings.translateTo)}`;
+  else if (scan.translateStatus === 'same') text = `Already in ${languageName(settings.translateTo)}`;
+  else if (scan.translateStatus === 'off') text = 'Translation is off (Settings)';
+  else if (scan.translateStatus === 'failed') [text, state] = [`Translation failed: ${scan.translateError}`, 'error'];
+  status.textContent = text;
+  status.className = `lang-status${state ? ` ${state}` : ''}`;
 }
 
 function renderOverlays() {
   const W = photo.width;
   const H = photo.height;
   const pct = (value, total) => `${((value / total) * 100).toFixed(3)}%`;
-  const items = scan.status === 'done' ? scan.items : [];
-  $('#overlays').innerHTML = items
-    .map((item) => {
-      const { x0, y0, x1, y1 } = item.bbox;
-      const currency = currencyOf(item);
-      const converted = formatMoney(convert(item.amount, currency, settings.home), settings.home);
-      const original = formatMoney(item.amount, currency);
-      return `
-        <div class="price-box" style="left:${pct(x0, W)};top:${pct(y0, H)};width:${pct(x1 - x0, W)};height:${pct(y1 - y0, H)}"></div>
-        <button type="button" class="price-tag${item.confidence === 'low' ? ' low' : ''}" data-id="${item.id}"
-          style="left:${pct((x0 + x1) / 2, W)};top:${pct((y0 + y1) / 2, H)};--w:${x1 - x0};--h:${y1 - y0}"
-          aria-label="${escapeHtml(original)} is ${escapeHtml(converted)}">${escapeHtml(converted)}</button>`;
-    })
-    .join('');
+  if (scan.status !== 'done') {
+    $('#overlays').innerHTML = '';
+    return;
+  }
+  const rtl = isRtl(scan.language);
+  const obstacles = [...scan.lines.map((l) => l.bbox), ...scan.items.map((i) => i.bbox)];
+  // Translations are usually longer than the original (English vs Japanese), so each one may
+  // grow into the empty space beside its line, up to the next text or price on the same row.
+  const room = (box) => {
+    const h = box.y1 - box.y0;
+    let limit = rtl ? 0 : W;
+    for (const other of obstacles) {
+      if (other === box || Math.min(other.y1, box.y1) - Math.max(other.y0, box.y0) < h * 0.4) continue;
+      if (!rtl && other.x0 >= box.x1 - 1) limit = Math.min(limit, other.x0 - h * 0.3);
+      if (rtl && other.x1 <= box.x0 + 1) limit = Math.max(limit, other.x1 + h * 0.3);
+    }
+    return Math.max(box.x1 - box.x0, rtl ? box.x1 - limit : limit - box.x0);
+  };
+  const textTags = !scan.translations
+    ? []
+    : scan.lines.map((line) => {
+        const translated = scan.translations.get(line.text);
+        if (!translated) return '';
+        const { x0, y0, x1, y1 } = line.bbox;
+        const h = y1 - y0;
+        const pad = h * 0.12;
+        const avail = room(line.bbox);
+        // Font size in photo pixels; the monospace font is ~0.6em per character, plus padding.
+        const fs = Math.min(h * 0.85, avail / ((translated.length + 1) * 0.6));
+        const side = rtl ? `right:${pct(W - x1, W)}` : `left:${pct(x0, W)}`;
+        return `<div class="text-tag${rtl ? ' rtl' : ''}" dir="auto" style="${side};top:${pct(y0 - pad, H)};height:${pct(h + pad * 2, H)};min-width:${pct(x1 - x0, W)};max-width:${pct(avail, W)};--fs:${fs.toFixed(1)}">${escapeHtml(translated)}</div>`;
+      });
+  const priceTags = scan.items.map((item) => {
+    const { x0, y0, x1, y1 } = item.bbox;
+    const currency = currencyOf(item);
+    const converted = formatMoney(convert(item.amount, currency, settings.home), settings.home);
+    const original = formatMoney(item.amount, currency);
+    return `
+      <div class="price-box" style="left:${pct(x0, W)};top:${pct(y0, H)};width:${pct(x1 - x0, W)};height:${pct(y1 - y0, H)}"></div>
+      <button type="button" class="price-tag${item.confidence === 'low' ? ' low' : ''}" data-id="${item.id}"
+        style="left:${pct((x0 + x1) / 2, W)};top:${pct((y0 + y1) / 2, H)};--w:${x1 - x0};--h:${y1 - y0}"
+        aria-label="${escapeHtml(original)} is ${escapeHtml(converted)}">${escapeHtml(converted)}</button>`;
+  });
+  $('#overlays').innerHTML = textTags.join('') + priceTags.join('');
   keepTagsInside();
 }
 
@@ -464,7 +738,7 @@ function friendlyError(error) {
 function renderSummary() {
   const el = $('#scan-summary');
   if (scan.status === 'reading') {
-    el.innerHTML = '<p class="empty-note">Looking for prices…</p>';
+    el.innerHTML = '<p class="empty-note">Scanning for prices…</p>';
     return;
   }
   if (scan.status === 'error') {
@@ -480,14 +754,42 @@ function renderSummary() {
   const count = scan.items.length;
   const rows = scan.items.map((item) => {
     const currency = currencyOf(item);
-    const guessed = !item.fixedCurrency && (!item.candidates || !settings.detectCurrency);
+    const original = formatMoney(item.amount, currency);
+    const translated = translatedLabel(item);
+    const name = translated || item.label;
+    const details = [];
+    if (translated && translated !== item.label) details.push(item.label);
+    if (name) details.push(original);
+    if (!item.fixedCurrency && (!item.candidates || !settings.detectCurrency)) details.push(`no sign → ${currency}`);
     return `<button type="button" class="price-row" data-id="${item.id}">
-      <span class="orig">${escapeHtml(formatMoney(item.amount, currency))}${guessed ? `<small>No currency sign · read as ${currency}</small>` : ''}</span>
+      <span class="item">
+        <span class="name" dir="auto">${escapeHtml(name || original)}</span>
+        ${details.length ? `<span class="sub" dir="auto">${escapeHtml(details.join(' · '))}</span>` : ''}
+      </span>
       <span class="conv">${escapeHtml(formatMoney(convert(item.amount, currency, settings.home), settings.home))}</span>
       <svg aria-hidden="true"><use href="#i-chevron"/></svg>
     </button>`;
   });
-  el.innerHTML = `<div class="summary-head"><h2>${count} price${count === 1 ? '' : 's'} found</h2><span>Tap one to fix it</span></div>${rows.join('')}`;
+  el.innerHTML = `<div class="panel-head"><span>${count} price${count === 1 ? '' : 's'} found</span><span>Tap to fix</span></div>${rows.join('')}`;
+}
+
+function renderTranslationCard() {
+  const card = $('#translation-card');
+  const entries = scan.translations ? scan.lines.filter((line) => scan.translations.get(line.text)) : [];
+  card.hidden = !entries.length;
+  if (card.hidden) {
+    $('#translation-list').innerHTML = '';
+    return;
+  }
+  $('#translation-pair').textContent = `${scan.language.toUpperCase()} → ${settings.translateTo.toUpperCase()}`;
+  $('#translation-list').innerHTML = entries
+    .map(
+      (line) => `<div class="translation-row">
+        <span class="orig" dir="auto">${escapeHtml(line.text)}</span>
+        <span class="tr" dir="auto">${escapeHtml(scan.translations.get(line.text))}</span>
+      </div>`
+    )
+    .join('');
 }
 
 for (const input of $$('[data-photo-input]')) {
@@ -519,6 +821,19 @@ $('#overlays').addEventListener('click', (event) => {
   if (tag) openPriceSheet(Number(tag.dataset.id));
 });
 
+$('#lang-button').addEventListener('click', () => {
+  if (scan.status !== 'done') return;
+  openPicker({
+    title: 'Text language',
+    items: languageItems(['auto', ...SCAN_LANGUAGES]),
+    selected: scan.language || 'auto',
+    placeholder: 'Search language',
+    onSelect: (code) => analyseLanguage(scan.run, code === 'auto' ? null : code),
+  });
+});
+
+$('#lang-set-local').addEventListener('click', () => setCurrency('source', photoCurrency().code));
+
 /* ---------- Edit a scanned price ---------- */
 
 const priceSheet = $('#price-sheet');
@@ -529,7 +844,8 @@ function openPriceSheet(id) {
   editing = scan.items.find((item) => item.id === id);
   if (!editing) return;
   priceAmount.value = formatInputNumber(editing.amount, currencyOf(editing));
-  $('#price-note').textContent = `Read from the photo as “${editing.text}”`;
+  const name = editing.label ? `${editing.label}: ` : '';
+  $('#price-note').textContent = `${name}read as “${editing.text}”`;
   renderPriceSheet();
   openSheet(priceSheet);
 }
@@ -543,6 +859,7 @@ function renderPriceSheet() {
 
 priceAmount.addEventListener('input', () => {
   editing.amount = parseUserNumber(priceAmount.value);
+  scan.edited = true;
   renderPriceSheet();
   renderOverlays();
   renderSummary();
@@ -552,9 +869,13 @@ $('#price-currency').addEventListener('click', () => {
   const item = editing;
   openPicker({
     title: 'Currency of this price',
+    items: currencyItems(),
     selected: currencyOf(item),
+    recent: settings.recent,
+    placeholder: 'Search currency or country',
     onSelect: (code) => {
       item.fixedCurrency = code;
+      scan.edited = true;
       rememberRecent(code);
       saveSettings();
       renderPriceSheet();
@@ -565,6 +886,7 @@ $('#price-currency').addEventListener('click', () => {
 
 $('#price-remove').addEventListener('click', () => {
   scan.items = scan.items.filter((item) => item !== editing);
+  scan.edited = true;
   closeSheet(priceSheet);
   renderScan();
 });
@@ -582,10 +904,35 @@ $('#price-open').addEventListener('click', () => {
 
 /* ---------- Settings ---------- */
 
-$('#detect-toggle').addEventListener('change', (event) => {
-  settings.detectCurrency = event.target.checked;
-  saveSettings();
-  renderScan();
+const toggles = { '#detect-toggle': 'detectCurrency', '#guess-toggle': 'guessCurrency', '#translate-toggle': 'translate' };
+for (const [selector, key] of Object.entries(toggles)) {
+  $(selector).addEventListener('change', (event) => {
+    settings[key] = event.target.checked;
+    saveSettings();
+    if (key === 'translate' && scan.language) translateScan(liveCheck());
+    renderAll();
+  });
+}
+
+// A check that goes stale as soon as a new photo or language choice comes in.
+function liveCheck() {
+  const { run, langRun } = scan;
+  return () => run === scan.run && langRun === scan.langRun;
+}
+
+$('#translate-to').addEventListener('click', () => {
+  openPicker({
+    title: 'Translate to',
+    items: languageItems(TARGET_LANGUAGES),
+    selected: settings.translateTo,
+    placeholder: 'Search language',
+    onSelect: (code) => {
+      settings.translateTo = code;
+      saveSettings();
+      renderAll();
+      if (scan.language) translateScan(liveCheck());
+    },
+  });
 });
 
 $('#refresh-rates').addEventListener('click', () => updateRates({ manual: true }));
@@ -615,7 +962,7 @@ function renderInstall() {
   $('#install-card').hidden = standalone || (!installPrompt && !ios);
   $('#install-btn').hidden = !installPrompt;
   $('#install-hint').textContent = installPrompt
-    ? 'Add it to your home screen for one-tap access and offline use.'
+    ? 'One-tap access and offline use.'
     : 'In Safari, tap the Share button, then “Add to Home Screen”.';
 }
 
@@ -623,7 +970,10 @@ function renderInstall() {
 
 function renderChip(el, code, withChevron) {
   const currency = getCurrency(code);
-  el.innerHTML = `<span class="flag" aria-hidden="true">${currency.flag}</span>${code}${withChevron ? '<svg aria-hidden="true"><use href="#i-down"/></svg>' : ''}`;
+  const glyph = symbolGlyph(currency);
+  el.innerHTML = `<span class="sym${glyph.length > 2 ? ' long' : ''}" aria-hidden="true">${escapeHtml(glyph)}</span>${code}${
+    withChevron ? '<svg aria-hidden="true"><use href="#i-down"/></svg>' : ''
+  }`;
   el.setAttribute('aria-label', `${currency.name}. Change currency`);
 }
 
@@ -632,7 +982,8 @@ function renderAll() {
   for (const el of $$('[data-chip-text]')) el.textContent = settings[el.dataset.chipText];
   for (const el of $$('[data-name]')) el.textContent = getCurrency(settings[el.dataset.name]).name;
   $('#welcome').hidden = settings.welcomed;
-  $('#detect-toggle').checked = settings.detectCurrency;
+  for (const [selector, key] of Object.entries(toggles)) $(selector).checked = settings[key];
+  $('#translate-to-value').textContent = languageName(settings.translateTo);
   renderConverterValues();
   renderRateLine();
   renderReference();
