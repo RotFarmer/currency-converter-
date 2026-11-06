@@ -1,6 +1,6 @@
 # Currency Converter
 
-A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with twelve whole-app themes, from the default mech-HUD look to an animated aurora, medieval parchment, an autumn forest, the ocean and Windows 95. On Android it is also a real app with three home-screen widgets: a keypad converter, a quick reference table and a one-tap live camera.
+A currency converter for your phone. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too. It comes with thirteen whole-app themes, from the default mech-HUD look to an animated aurora, medieval parchment, a snowy medieval pine swamp, an autumn forest, the ocean and Windows 95. On Android it is also a real app with three home-screen widgets: a keypad converter, a quick reference table and a one-tap live camera.
 
 - **Themes.** Settings → Appearance → Theme changes the fonts, colours and the shape of every panel, button and switch:
   - **HUD** (default): phosphor green mech HUD. Pick an accent colour (presets or any colour), turn scanlines, grid and glow on or off, and choose the HUD or a clean font.
@@ -9,6 +9,7 @@ A currency converter for your phone. Set a default currency once, and every pric
   - **Cottage**: gingham and lace, soft serif with handwritten labels, sage and dusty rose. Evening fireflies in dark mode.
   - **Forest**: autumn woods with leaves drifting down the screen, a wooden trail-sign title, a tree line and a wood tab bar. Moonlit forest by a campfire in dark mode.
   - **Ocean**: tropical shallows with rippling light, rising bubbles, a coral reef floor and a wavy water-surface tab bar. The deep sea with glowing bioluminescent accents in dark mode.
+  - **Frostmire**: a medieval snowy pine swamp. Black ornate blackletter on frosted parchment, snow falling in two layers, icicles under the header, snow lying on every panel, stag beetle and toadstool ornaments, a fly-agaric badge, and a frozen-water tab bar. Scroll to the end of a screen to see the swamp: snow-laden pines, a log of toadstools, a stag beetle, reeds and ice on the water. The mire by moonlight, with silver-grey text, in dark mode.
   - **Cloud**: pastel sky with fluffy clouds, bubbly letters, pink-to-lavender buttons, a floating tab bar. Night clouds in dark mode.
   - **Aero**: Frutiger Aero glass panels, sky and bubbles, glossy aqua buttons.
   - **90s**: Windows 95 grey bevels, blue title bars with ✕, checkboxes, a teal desktop. Light only.
@@ -16,7 +17,7 @@ A currency converter for your phone. Set a default currency once, and every pric
   - **8-bit**: pixel fonts, chunky pixel borders, a starfield. Dark only.
   - **Notebook**: lined paper, handwriting, tape and highlighter. A chalkboard in dark mode.
 
-  System / Light / Dark applies to every theme that has both. **Reset to default look** goes back to the green HUD. The moving backgrounds (aurora, leaves, bubbles) stay still if your phone's reduce-motion setting is on. The live camera view keeps the HUD look so the overlays stay readable on any photo.
+  System / Light / Dark applies to every theme that has both. **Reset to default look** goes back to the green HUD. The moving backgrounds (aurora, leaves, bubbles, snow) stay still if your phone's reduce-motion setting is on. The live camera view keeps the HUD look so the overlays stay readable on any photo.
 - **Home currency.** You choose it on first launch (with a suggestion from your phone's region) and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
 - **"Price in" follows your location.** It's set to the currency of the country you're in: from GPS if you allow location, otherwise from your phone's time zone, which updates automatically when you travel. Picking "Price in" yourself turns this off; switch it back on in Settings.
 - **Quick reference tabs.** Tables of amounts, always shown in your home currency: one tab for your "Price in" currency and one for each currency in the ☰ drawer. Swipe left/right or tap a tab to switch; tap a row to put that amount in the converter. Tap **Edit** to choose the amounts for the currency on screen: remove the ones you don't need, type your own, or add back suggested ones. Each currency keeps its own list, and **Reset** brings back the suggested amounts.
