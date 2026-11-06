@@ -18,6 +18,8 @@ export const SKINS = [
   { id: 'hud', name: 'HUD' },
   { id: 'medieval', name: 'Medieval' },
   { id: 'cottage', name: 'Cottage' },
+  { id: 'forest', name: 'Forest' },
+  { id: 'ocean', name: 'Ocean' },
   { id: 'cloud', name: 'Cloud' },
   { id: 'aero', name: 'Aero' },
   { id: 'retro95', name: '90s', mode: 'light' },
