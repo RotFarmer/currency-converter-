@@ -17,7 +17,7 @@ It's a web app (PWA), so it runs on iPhone and Android with no app store and no 
 ## Using it on your phone
 
 1. Open **https://rotfarmer.github.io/currency-converter-/** in Safari (iPhone) or Chrome (Android).
-2. Install it when the prompt appears (or later from Settings → Install):
+2. Install it when the prompt appears, or any time with the **Install** button at the top:
    - **iPhone:** tap Share (on newer iPhones, ••• first), then **Add to Home Screen**.
    - **Android:** tap **Install**.
 3. Choose your **default currency** and the currency **prices are in** (the local currency where you are).
@@ -73,7 +73,7 @@ Project layout:
 | `fonts/` | Share Tech Mono and Chakra Petch (SIL Open Font License) |
 | `tests/` | Unit tests (`node --test`) |
 
-When you change any app file, bump `VERSION` in `sw.js` so installed copies pick up the update.
+When you change any app file, bump `VERSION` in `sw.js` and `APP_VERSION` in `js/app.js` (shown at the bottom of Settings). The app always loads the newest files when online and uses its saved copy only offline; when a new service worker takes over, open pages reload themselves once.
 
 ### How the language is identified
 

@@ -30,6 +30,7 @@
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><path d="M5 5h10v10H5zM15 15l5 5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v4h16v-4"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H4v11h16V10h-3"/></symbol>
     <symbol id="i-add" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 8v8M8 12h8"/></symbol>
     <symbol id="i-torch" viewBox="0 0 24 24"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z"/><path d="M12 13v2"/></symbol>
@@ -42,9 +43,14 @@
         <span class="sys-code" id="view-code" aria-hidden="true">01</span>
         <h1 id="view-title">Convert</h1>
       </div>
-      <button id="rates-pill" class="rates-pill" type="button" aria-label="Refresh exchange rates">
-        <span class="dot" aria-hidden="true"></span><span class="label">Loading rates…</span>
-      </button>
+      <div class="topbar-actions">
+        <button id="install-top" class="install-top" type="button" aria-label="Install app" hidden>
+          <svg aria-hidden="true"><use href="#i-download"/></svg><span>Install</span>
+        </button>
+        <button id="rates-pill" class="rates-pill" type="button" aria-label="Refresh exchange rates">
+          <span class="dot" aria-hidden="true"></span><span class="label">Rates…</span>
+        </button>
+      </div>
     </header>
 
     <main>
@@ -249,6 +255,7 @@
           Translation: on-device where the browser supports it, otherwise
           <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>
           (free, about 5,000 characters a day).
+          Version <span id="app-version"></span>.
         </p>
       </section>
     </main>
@@ -316,9 +323,10 @@
         <li>Scroll down and tap <span class="key"><svg><use href="#i-add"/></svg>Add to Home Screen</span>.</li>
         <li>Tap <span class="key">Add</span>.</li>
       </ol>
+      <p class="install-note" id="install-note-ios" hidden>Opened this link inside another app? Open it in Safari first.</p>
       <ol class="install-steps" id="install-steps-menu" hidden>
-        <li>Open the browser menu <span class="key">⋮</span>.</li>
-        <li>Tap <span class="key">Install</span> or <span class="key">Add to Home screen</span>.</li>
+        <li>Open the browser menu: <span class="key">⋮</span> at the top right in Chrome, <span class="key">≡</span> in Samsung Internet.</li>
+        <li>Tap <span class="key">Install app</span> or <span class="key">Add to Home screen</span>.</li>
       </ol>
       <div class="sheet-actions">
         <button type="button" class="btn btn-ghost" data-close id="install-later">Not now</button>

@@ -18,6 +18,8 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines } from './translate.js';
 import { load, save } from './storage.js';
 
+const APP_VERSION = 'v4'; // keep in step with VERSION in sw.js
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const escapeHtml = (text) =>
@@ -88,19 +90,27 @@ function renderRatesStatus() {
   const pill = $('#rates-pill');
   const rates = getRates();
   let state;
-  let label;
+  let label; // kept short so the header fits on a phone
+  let description;
   if (!rates) {
     state = ratesLoading ? 'loading' : 'error';
-    label = ratesLoading ? 'Loading rates…' : 'No rates · retry';
+    label = ratesLoading ? 'Rates…' : 'No rates';
+    description = ratesLoading ? 'Loading exchange rates' : 'No exchange rates yet. Tap to retry.';
   } else if (ratesLoading) {
     state = 'loading';
-    label = 'Updating…';
+    label = 'Rates…';
+    description = 'Updating exchange rates';
   } else {
     state = ratesFailed || ratesAreStale() ? 'old' : 'ok';
-    label = `${ratesFailed ? 'Offline' : 'Rates'} ${timeAgo(rates.updatedAt)}`;
+    const age = Math.max(0, Date.now() - rates.updatedAt);
+    const short = age < 3600e3 ? `${Math.max(1, Math.round(age / 60e3))}m` : age < 48 * 3600e3 ? `${Math.round(age / 3600e3)}h` : `${Math.round(age / 86400e3)}d`;
+    label = `${ratesFailed ? 'Offline' : 'Rates'} ${short}`;
+    description = `${ratesFailed ? 'Offline. ' : ''}Exchange rates updated ${timeAgo(rates.updatedAt)}. Tap to refresh.`;
   }
   pill.dataset.state = state;
   $('.label', pill).textContent = label;
+  pill.setAttribute('aria-label', description);
+  pill.title = description;
   $('#rates-detail').textContent = rates ? `${formatDateTime(rates.updatedAt)} · ${rates.provider}` : 'Not downloaded yet';
 }
 
@@ -1085,13 +1095,16 @@ $('#refresh-rates').addEventListener('click', () => updateRates({ manual: true }
 $('#rates-pill').addEventListener('click', () => updateRates({ manual: true }));
 
 /* ---------- Install prompt ---------- */
-// Chrome and Edge offer a real install dialog (beforeinstallprompt). iPhones don't let websites
-// trigger one, so there the prompt shows the Add to Home Screen steps instead.
+// Chrome and Edge offer a real install dialog (beforeinstallprompt), but Chrome only allows it
+// once you've used the page for a little while. Until then (and on browsers without it) the
+// prompt shows where to find "Install app" in the menu; it switches to an Install button as
+// soon as Chrome allows. iPhones never let websites install themselves, so there it shows the
+// Add to Home Screen steps.
 
 const installSheet = $('#install-sheet');
 const ua = navigator.userAgent;
 const isIos = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const isFirefoxAndroid = /Android/i.test(ua) && /Firefox/i.test(ua);
+const isAndroid = /Android/i.test(ua);
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 let installPrompt = null;
 
@@ -1099,20 +1112,25 @@ function installKind() {
   if (isStandalone()) return null;
   if (installPrompt) return 'native';
   if (isIos) return 'ios';
-  if (isFirefoxAndroid) return 'menu';
+  if (isAndroid) return 'menu';
   return null;
 }
 
-function openInstallSheet() {
+function fillInstallSheet() {
   const kind = installKind();
-  if (!kind) return;
   $('#install-steps-ios').hidden = kind !== 'ios';
+  $('#install-note-ios').hidden = kind !== 'ios';
   $('#install-steps-menu').hidden = kind !== 'menu';
   $('#install-now').hidden = kind !== 'native';
   $('#install-later').textContent = kind === 'native' ? 'Not now' : 'Got it';
   $('#install-later').className = `btn ${kind === 'native' ? 'btn-ghost' : 'btn-primary'}`;
+}
+
+function openInstallSheet() {
+  if (!installKind()) return;
+  fillInstallSheet();
   save('installPromptShown', Date.now());
-  openSheet(installSheet);
+  if (installSheet.hidden) openSheet(installSheet);
 }
 
 /** Show the prompt on its own, unless it was shown recently or the app is installed. */
@@ -1129,7 +1147,8 @@ window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault();
   installPrompt = event;
   renderInstall();
-  setTimeout(maybePromptInstall, 1000);
+  if (!installSheet.hidden) fillInstallSheet(); // already showing the menu steps: offer the button
+  else setTimeout(maybePromptInstall, 1000);
 });
 window.addEventListener('appinstalled', () => {
   installPrompt = null;
@@ -1149,11 +1168,13 @@ $('#install-now').addEventListener('click', async () => {
   renderInstall();
 });
 $('#install-btn').addEventListener('click', openInstallSheet);
+$('#install-top').addEventListener('click', openInstallSheet);
 
 function renderInstall() {
   const kind = installKind();
   $('#install-card').hidden = !kind;
   $('#install-btn-label').textContent = kind === 'native' ? 'Install app' : 'Show me how';
+  $('#install-top').hidden = !kind || load('installed', false);
 }
 
 /* ---------- Shared rendering ---------- */
@@ -1235,9 +1256,15 @@ saveSettings();
 renderAll();
 if (ratesAreStale()) updateRates();
 
+$('#app-version').textContent = APP_VERSION;
 if (isStandalone()) save('installed', true);
-else if (isIos || isFirefoxAndroid) setTimeout(maybePromptInstall, 1500);
+else if (isIos) setTimeout(maybePromptInstall, 1500);
+else if (isAndroid) setTimeout(maybePromptInstall, 3000); // gives Chrome a moment to allow its real dialog
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Check for a new version on every launch; sw.js reloads the page when one takes over.
+  navigator.serviceWorker
+    .register('sw.js')
+    .then((registration) => registration.update())
+    .catch(() => {});
 }

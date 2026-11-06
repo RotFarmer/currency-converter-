@@ -107,7 +107,7 @@ strong { color: var(--accent); font-weight: 400; }
   opacity: 0.7;
 }
 
-.title-block { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.title-block { display: flex; align-items: baseline; gap: 10px; min-width: 0; overflow: hidden; }
 .sys-code { font: 600 12px var(--font-head); color: var(--on-accent); background: var(--accent); padding: 1px 5px; letter-spacing: 0.05em; }
 .topbar h1 {
   margin: 0;
@@ -115,7 +115,36 @@ strong { color: var(--accent); font-weight: 400; }
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+@media (max-width: 400px) {
+  .topbar h1 { font-size: 20px; letter-spacing: 0.1em; }
+}
+@media (max-width: 360px) {
+  .install-top span { display: none; } /* icon only on the narrowest phones */
+  .install-top { padding: 4px 8px; }
+  .topbar { gap: 8px; }
+}
+
+.topbar-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.install-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 600 11px var(--font-head);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+.install-top svg { width: 16px; height: 16px; stroke-width: 2.2; }
+.install-note { margin: 0 0 10px; font-size: 12px; color: var(--text-faint); }
 
 .rates-pill {
   display: inline-flex;
@@ -688,6 +717,7 @@ main { padding: 16px 16px 0; }
   animation: rise 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .sheet-full { height: calc(100% - env(safe-area-inset-top) - 12px); }
+.sheet-bottom { max-height: calc(100% - env(safe-area-inset-top) - 12px); overflow-y: auto; overscroll-behavior: contain; }
 .sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
 .sheet-header h2 { margin: 0; font: 600 16px var(--font-head); letter-spacing: 0.18em; text-transform: uppercase; }
 .sheet-note { margin: 0 0 6px; color: var(--text-dim); font-size: 13px; }
@@ -734,21 +764,23 @@ main { padding: 16px 16px 0; }
 
 .price-result { margin: 10px 0 16px; font-size: 28px; text-align: right; color: var(--accent); text-shadow: 0 0 10px var(--glow); }
 .sheet-actions { display: flex; gap: 10px; }
+.sheet-bottom .sheet-actions { position: sticky; bottom: 0; margin-top: auto; padding-top: 8px; background: var(--panel); }
 .sheet-actions .btn { flex: 1; }
 .sheet-actions .btn-ghost { flex: 0 0 auto; }
 
 /* ---------- Install prompt ---------- */
 
-.install-intro { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.install-intro { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.install-intro img { width: 48px; height: 48px; }
 .install-intro img { flex-shrink: 0; filter: drop-shadow(0 0 8px var(--glow)); }
-.install-intro p { margin: 0; font-size: 14px; color: var(--text-dim); }
-.install-steps { margin: 0 0 16px; padding: 0; list-style: none; counter-reset: step; }
-.install-steps li { position: relative; padding: 10px 0 10px 38px; border-top: 1px solid var(--line); font-size: 14px; counter-increment: step; }
+.install-intro p { margin: 0; font-size: 13px; color: var(--text-dim); }
+.install-steps { margin: 0 0 10px; padding: 0; list-style: none; counter-reset: step; }
+.install-steps li { position: relative; padding: 8px 0 8px 36px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.6; counter-increment: step; }
 .install-steps li::before {
   content: counter(step);
   position: absolute;
   left: 0;
-  top: 9px;
+  top: 8px;
   display: grid;
   place-items: center;
   width: 24px;
