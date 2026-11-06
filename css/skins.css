@@ -109,7 +109,7 @@
 :root[data-skin] .menu-btn::before { content: none; }
 :root[data-skin] .menu-btn[aria-expanded="true"] { background: var(--menu-open-fill); box-shadow: inset 0 0 0 1.5px var(--accent); }
 :root[data-skin] .sym { border-radius: 8px; font-family: var(--font-num); }
-:root[data-skin] :is(.clear-btn, .row-remove, .icon-btn, .search-wrap input, .ref-tab, .add-btn, .rates-pill, .badge, .key, .segmented) {
+:root[data-skin] :is(.clear-btn, .row-remove, .icon-btn, .search-wrap input, .ref-tab, .add-btn, .rates-pill, .badge, .key, .segmented, .ref-chip, .ref-add input) {
   border-radius: var(--radius-sm);
 }
 :root[data-skin] :is(.extra, .photo-wrap) { border-radius: var(--radius); }
@@ -705,6 +705,8 @@
   font-size: 13px;
 }
 :root[data-skin="retro95"] .panel-head > span + span { color: #fff !important; font-weight: 400; font-size: 12px; }
+:root[data-skin="retro95"] .panel-head .head-btn { color: #fff; font-weight: 400; }
+:root[data-skin="retro95"] .ref-chip.suggest { box-shadow: none; outline: 1px dotted #000; outline-offset: -3px; background: #c0c0c0; }
 :root[data-skin="retro95"] .panel-head::after {
   content: "✕";
   display: grid;
@@ -717,7 +719,7 @@
   font-size: 10px;
   box-shadow: var(--raised);
 }
-:root[data-skin="retro95"] :is(.btn, .install-top, .currency-chip, .menu-btn, .add-btn, .row-remove, .clear-btn, .icon-btn, .ref-tab, .rates-pill, .segmented button) {
+:root[data-skin="retro95"] :is(.btn, .install-top, .currency-chip, .menu-btn, .add-btn, .row-remove, .clear-btn, .icon-btn, .ref-tab, .rates-pill, .segmented button, .ref-chip) {
   background: #c0c0c0;
   color: #000;
   border: 0;
@@ -740,7 +742,8 @@
 :root[data-skin="retro95"] .segmented button { border-left: 0; }
 :root[data-skin="retro95"] .amount-input,
 :root[data-skin="retro95"] .extra-input,
-:root[data-skin="retro95"] .search-wrap input {
+:root[data-skin="retro95"] .search-wrap input,
+:root[data-skin="retro95"] .ref-add input {
   background: #fff;
   border: 0;
   box-shadow: var(--sunken);
@@ -976,6 +979,8 @@
 :root[data-skin="pixel"] .panel-head { font-size: 10px; color: var(--accent); border-bottom: 4px dotted var(--line); line-height: 1.6; }
 :root[data-skin="pixel"] .panel-head > span:first-child::before { content: "►"; width: auto; height: auto; background: none; color: var(--red); font-size: 10px; }
 :root[data-skin="pixel"] .panel-head > span + span { font-family: var(--font-mono); font-size: 16px; }
+:root[data-skin="pixel"] .panel-head #ref-hint { display: none; }
+:root[data-skin="pixel"] .panel-head .head-btn { margin-left: auto; }
 :root[data-skin="pixel"] .field-label, :root[data-skin="pixel"] .setting-label { font-size: 9px; line-height: 1.6; }
 :root[data-skin="pixel"] .badge { font-size: 8px; padding: 3px 4px; }
 :root[data-skin="pixel"] :is(.btn, .install-top) {
@@ -1524,9 +1529,10 @@
 
 /* Pixel fonts and handwriting look small at the HUD's small-print sizes */
 :root:is([data-skin="vapor"], [data-skin="pixel"], [data-skin="notebook"]) :is(.extra-head, .extra-row .name, .field-sub, .row-hint, .price-row .sub,
-  .translation-row .orig, .footnote, .lang-status, .lang-google, .install-note, .setting-note, .readout .note, .camera-status) {
+  .translation-row .orig, .footnote, .lang-status, .lang-google, .install-note, .setting-note, .readout .note, .camera-status, .ref-chip .home) {
   font-size: 16px;
 }
+:root:is([data-skin="vapor"], [data-skin="pixel"]) .ref-chip { font-size: 19px; }
 :root:is([data-skin="vapor"], [data-skin="pixel"]) :is(.picker-row .sub, .scan-intro > p, .hint, .list-row .row-hint) { font-size: 18px; line-height: 1.3; }
 :root[data-skin="notebook"] :is(.add-btn, .badge, .ref-head, .readout .k, .picker-section, .skin-name, .menu-btn, .field-label) { font-size: 16px; letter-spacing: 0.02em; }
 :root[data-skin="notebook"] .badge { font-size: 13px; }

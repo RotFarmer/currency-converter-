@@ -57,6 +57,7 @@
     <symbol id="i-search" viewBox="0 0 24 24"><path d="M5 5h10v10H5zM15 15l5 5"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v4h16v-4"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H4v11h16V10h-3"/></symbol>
     <symbol id="i-add" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 8v8M8 12h8"/></symbol>
@@ -138,7 +139,8 @@
         </div>
 
         <div class="panel">
-          <div class="panel-head"><span>Quick reference</span><span id="ref-hint"></span></div>
+          <div class="panel-head"><span>Quick reference</span><span id="ref-hint"></span>
+            <button type="button" class="head-btn" id="ref-edit" hidden><svg aria-hidden="true"><use href="#i-edit"/></svg>Edit</button></div>
           <div class="ref-tabs" id="ref-tabs" role="tablist" aria-label="Convert to" hidden></div>
           <div class="ref-track" id="reference"></div>
           <div class="ref-dots" id="ref-dots" aria-hidden="true"></div>
@@ -450,6 +452,30 @@
       <div class="sheet-actions">
         <button type="button" class="btn btn-ghost danger" id="price-remove">Remove</button>
         <button type="button" class="btn btn-secondary" id="price-open">Open in converter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick reference amounts -->
+  <div class="sheet-backdrop" id="ref-sheet" hidden>
+    <div class="sheet sheet-bottom" role="dialog" aria-modal="true" aria-labelledby="ref-sheet-title">
+      <div class="sheet-header">
+        <h2 id="ref-sheet-title">Quick reference</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <p class="sheet-note" id="ref-sheet-note"></p>
+      <div class="setting-label first">In the table</div>
+      <div class="ref-chips" id="ref-chips"></div>
+      <form class="ref-add" id="ref-add" autocomplete="off">
+        <span class="sym" id="ref-add-sym" aria-hidden="true"></span>
+        <input id="ref-add-input" inputmode="decimal" enterkeyhint="done" placeholder="Add an amount" aria-label="Amount to add">
+        <button type="submit" class="btn btn-secondary btn-small">Add</button>
+      </form>
+      <div class="setting-label" id="ref-suggest-label">Suggestions</div>
+      <div class="ref-chips" id="ref-suggest"></div>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost" id="ref-reset">Reset</button>
+        <button type="button" class="btn btn-primary" data-close>Done</button>
       </div>
     </div>
   </div>

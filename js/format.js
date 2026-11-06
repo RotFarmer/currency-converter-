@@ -66,6 +66,19 @@ export function parseUserNumber(text) {
   return Number.isFinite(value) ? value : null;
 }
 
+const LOCALE_DECIMAL = new Intl.NumberFormat(LOCALE).formatToParts(1.5).find((part) => part.type === 'decimal')?.value || '.';
+
+/**
+ * An amount typed in one go and then confirmed (not read live while typing). "1,500" or "1.500" is fifteen
+ * hundred unless that separator is how the phone writes decimals; in a currency without decimals it always is.
+ */
+export function parseAmountEntry(text, fractionDigits = 2, decimalSeparator = LOCALE_DECIMAL) {
+  const s = String(text).replace(/[^\d.,]/g, '');
+  const single = /^\d{1,3}([.,])\d{3}$/.exec(s);
+  if (single && (fractionDigits === 0 || single[1] !== decimalSeparator)) return Number(s.replace(/[.,]/g, ''));
+  return parseUserNumber(s);
+}
+
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
 export function timeAgo(timestamp, now = Date.now()) {

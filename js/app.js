@@ -12,7 +12,7 @@ import {
 import { detectRegion } from './location.js';
 import { ACCENT_PRESETS, SKINS, accentPalette, skinById, toCssText } from './theme.js';
 import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
-import { formatMoney, formatRate, formatInputNumber, parseUserNumber, timeAgo, formatDateTime } from './format.js';
+import { formatMoney, formatRate, formatInputNumber, parseUserNumber, parseAmountEntry, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
 import { photoToCanvas, preloadOcr, readText } from './ocr.js';
 import { cameraSupported, startCamera, stopCamera, torchSupported, setTorch, grabFrame } from './camera.js';
@@ -22,7 +22,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v14'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v15'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -45,7 +45,8 @@ const settings = {
   translate: true,
   translateTo: defaultTargetLanguage(),
   recent: [],
-  extra: [], // up to 10 more currencies, kept in the ☰ drawer between the two amounts
+  extra: [], // up to 10 more currencies, kept in the ☰ drawer under the home currency
+  refAmounts: {}, // quick reference amounts the user chose, per currency (otherwise suggested ones)
   extraOpen: false,
   homeChosen: false, // the user picked their home currency themselves
   autoSource: true, // keep "prices in" set to the currency where the phone is
@@ -606,13 +607,27 @@ function referenceTargets() {
   return [settings.source, ...settings.extra].filter((code, i, all) => code !== settings.home && all.indexOf(code) === i);
 }
 
-/** Round amounts in a currency (1, 2, 5, 10 … scaled to its value) and what each is at home. */
+const MAX_REF_AMOUNTS = 20;
+
+/** Round amounts in a currency: 1, 2, 5, 10 … scaled to what one unit of your home currency is worth in it. */
+function suggestedAmounts(code) {
+  const homeInCode = convert(1, settings.home, code);
+  const base = 10 ** Math.max(0, Math.floor(Math.log10(homeInCode)));
+  return [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000].map((step) => step * base);
+}
+
+/** The amounts shown for a currency: the user's own list if they edited it, else the suggested ones. */
+function referenceAmounts(code) {
+  const custom = settings.refAmounts?.[code];
+  return Array.isArray(custom) ? custom : suggestedAmounts(code);
+}
+
+/** Amounts in a currency and what each is at home. */
 function referenceTable(code) {
   const { home } = settings;
-  const homeInCode = convert(1, home, code);
-  const base = 10 ** Math.max(0, Math.floor(Math.log10(homeInCode)));
-  const rows = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000].map((step) => {
-    const amount = step * base;
+  const amounts = referenceAmounts(code);
+  if (!amounts.length) return `<p class="empty-note">No amounts for ${code}. Tap Edit to add some.</p>`;
+  const rows = amounts.map((amount) => {
     return `<button type="button" class="ref-row" data-amount="${amount}" data-currency="${code}">
       <span>${formatMoney(amount, code)}</span><span>${formatMoney(convert(amount, code, home), home)}</span>
     </button>`;
@@ -625,6 +640,7 @@ function renderReference() {
   const targets = referenceTargets();
   const ready = convert(1, home, source) != null;
   refTabs.hidden = !ready || targets.length < 2;
+  $('#ref-edit').hidden = !ready || !targets.length;
   $('#ref-hint').textContent = ready && targets.length > 1 ? 'Swipe ← →' : '';
   $('#ref-dots').innerHTML = '';
   if (!ready) {
@@ -698,6 +714,83 @@ $('#reference').addEventListener('click', (event) => {
   const code = row.dataset.currency;
   setAmount(code === settings.source ? 'source' : `extra:${code}`, Number(row.dataset.amount));
   window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// Editing the quick reference: the amounts for the currency on screen.
+const refSheet = $('#ref-sheet');
+let refEditing = null;
+
+function openRefEditor() {
+  if (!refActive) return;
+  refEditing = refActive;
+  $('#ref-add-input').value = '';
+  renderRefEditor();
+  openSheet(refSheet);
+}
+
+function renderRefEditor() {
+  const code = refEditing;
+  if (!code) return;
+  const { home } = settings;
+  const currency = getCurrency(code);
+  const amounts = referenceAmounts(code);
+  const chip = (amount, add) => {
+    const label = formatMoney(amount, code);
+    return `<button type="button" class="ref-chip${add ? ' suggest' : ''}" data-ref-${add ? 'add' : 'remove'}="${amount}" aria-label="${add ? 'Add' : 'Remove'} ${label}">
+      <span>${label}</span><span class="home">${formatMoney(convert(amount, code, home), home)}</span>
+      <svg aria-hidden="true"><use href="#i-${add ? 'plus' : 'close'}"/></svg></button>`;
+  };
+  $('#ref-sheet-title').textContent = `Quick reference: ${code}`;
+  $('#ref-sheet-note').textContent = `Amounts in ${currency ? currency.name : code}, shown in ${home}. Tap one to remove it. Each currency keeps its own list.`;
+  $('#ref-chips').innerHTML = amounts.length ? amounts.map((amount) => chip(amount, false)).join('') : '<p class="empty-note">No amounts yet. Add some below.</p>';
+  const suggestions = suggestedAmounts(code).filter((amount) => !amounts.includes(amount));
+  $('#ref-suggest-label').hidden = $('#ref-suggest').hidden = !suggestions.length;
+  $('#ref-suggest').innerHTML = suggestions.map((amount) => chip(amount, true)).join('');
+  $('#ref-add-sym').textContent = symbolGlyph(currency);
+  $('#ref-reset').disabled = !Array.isArray(settings.refAmounts?.[code]);
+}
+
+function setRefAmounts(code, amounts) {
+  const list = [...new Set(amounts.map((amount) => Math.round(amount * 100) / 100))].filter((amount) => amount > 0).sort((x, y) => x - y);
+  const suggested = suggestedAmounts(code);
+  const isSuggested = list.length === suggested.length && list.every((amount, i) => amount === suggested[i]);
+  const refAmounts = { ...settings.refAmounts };
+  if (isSuggested) delete refAmounts[code];
+  else refAmounts[code] = list;
+  settings.refAmounts = refAmounts;
+  saveSettings();
+  renderReference();
+  renderRefEditor();
+}
+
+function addRefAmount(amount) {
+  if (!(amount > 0)) return false;
+  const amounts = referenceAmounts(refEditing);
+  if (amounts.includes(Math.round(amount * 100) / 100)) return true;
+  if (amounts.length >= MAX_REF_AMOUNTS) {
+    toast(`Up to ${MAX_REF_AMOUNTS} amounts per currency`);
+    return false;
+  }
+  setRefAmounts(refEditing, [...amounts, amount]);
+  return true;
+}
+
+$('#ref-edit').addEventListener('click', openRefEditor);
+refSheet.addEventListener('click', (event) => {
+  const remove = event.target.closest('[data-ref-remove]');
+  const add = event.target.closest('[data-ref-add]');
+  if (remove) setRefAmounts(refEditing, referenceAmounts(refEditing).filter((amount) => amount !== Number(remove.dataset.refRemove)));
+  else if (add) addRefAmount(Number(add.dataset.refAdd));
+});
+$('#ref-add').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const input = $('#ref-add-input');
+  if (addRefAmount(parseAmountEntry(input.value, fractionDigits(refEditing)))) input.value = '';
+  else input.focus();
+});
+$('#ref-reset').addEventListener('click', () => {
+  setRefAmounts(refEditing, suggestedAmounts(refEditing));
+  toast('Suggested amounts restored');
 });
 
 $('#welcome-choose').addEventListener('click', openHomeChooser);

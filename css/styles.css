@@ -604,6 +604,60 @@ main { padding: 16px 16px 0; }
 .ref-row:active span:last-child { color: var(--accent); }
 .empty-note { margin: 0; color: var(--text-dim); font-size: 14px; }
 
+/* Edit button in a panel header, and the quick reference editor */
+.panel-head #ref-hint { margin-left: auto; }
+/* On narrow phones the tabs and dots already show you can swipe */
+@media (max-width: 360px) {
+  .panel-head #ref-hint { display: none; }
+  .panel-head .head-btn { margin-left: auto; }
+}
+.head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  margin: -8px -6px -8px 0;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.head-btn svg { width: 15px; height: 15px; }
+.ref-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 4px 9px 4px 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  color: var(--text);
+  font: 15px var(--font-mono);
+}
+.ref-chip .home { color: var(--text-faint); font-size: 12px; }
+.ref-chip svg { width: 14px; height: 14px; color: var(--text-faint); }
+.ref-chip:active { background: var(--accent-soft); }
+.ref-chip.suggest { border-style: dashed; background: none; color: var(--text-dim); }
+.ref-chip.suggest svg { color: var(--accent); }
+.ref-add { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; }
+.ref-add input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  color: var(--text);
+  font: 18px var(--font-mono);
+}
+.ref-add input:focus { outline: none; border-color: var(--accent); }
+.ref-add input::placeholder { color: var(--text-faint); }
+.ref-add .btn { min-height: 42px; }
+
 .ref-tabs { display: flex; gap: 6px; margin: -2px 0 10px; padding-bottom: 2px; overflow-x: auto; scrollbar-width: none; }
 .ref-tabs::-webkit-scrollbar { display: none; }
 .ref-tab {
