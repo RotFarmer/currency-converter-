@@ -18,7 +18,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v4'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v5'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -41,6 +41,7 @@ const settings = {
   translate: true,
   translateTo: defaultTargetLanguage(),
   recent: [],
+  extra: [], // up to 10 more currencies shown under the converter
   welcomed: false,
   ...load('settings', {}),
 };
@@ -211,9 +212,13 @@ function languageItems(codes) {
   });
 }
 
-function openPicker({ title, items, selected, onSelect, recent = [], placeholder = 'Search' }) {
-  pickerState = { items, selected, onSelect, recent };
-  $('#picker-title').textContent = title;
+/**
+ * Open the picker. For a single choice pass `selected` and `onSelect`; for several pass `multi`:
+ * { selected: string[], max, onChange(codes) } and it stays open while the user ticks items.
+ */
+function openPicker({ title, items, selected, onSelect, recent = [], placeholder = 'Search', multi = null }) {
+  pickerState = { title, items, selected, onSelect, recent, multi };
+  renderPickerTitle();
   pickerSearch.value = '';
   pickerSearch.placeholder = placeholder;
   renderPickerList();
@@ -222,19 +227,28 @@ function openPicker({ title, items, selected, onSelect, recent = [], placeholder
   if (!matchMedia('(pointer: coarse)').matches) pickerSearch.focus();
 }
 
+function renderPickerTitle() {
+  const { title, multi } = pickerState;
+  $('#picker-title').textContent = multi ? `${title} ${multi.selected.length}/${multi.max}` : title;
+}
+
 function renderPickerList() {
   const query = pickerSearch.value.trim();
-  const { items, selected, recent } = pickerState;
+  const { items, selected, recent, multi } = pickerState;
+  const isSelected = (code) => (multi ? multi.selected.includes(code) : code === selected);
   const list = searchCurrencies(query, items);
   const row = (item) => `
-    <button type="button" class="picker-row" role="option" aria-selected="${item.code === selected}" data-code="${escapeHtml(item.code)}">
+    <button type="button" class="picker-row" role="option" aria-selected="${isSelected(item.code)}" data-code="${escapeHtml(item.code)}">
       <span class="sym${item.glyph.length > 2 ? ' long' : ''}" aria-hidden="true">${escapeHtml(item.glyph)}</span>
       <span class="title">${escapeHtml(item.title)}</span>
       <span class="sub">${escapeHtml(item.sub)}</span>
-      ${item.code === selected ? '<svg aria-hidden="true"><use href="#i-check"/></svg>' : ''}
+      ${isSelected(item.code) ? '<svg aria-hidden="true"><use href="#i-check"/></svg>' : ''}
     </button>`;
   let html = '';
-  if (!query && recent.length) {
+  if (!query && multi?.selected.length) {
+    const chosen = multi.selected.map((code) => items.find((i) => i.code === code)).filter(Boolean);
+    html += `<div class="picker-section">Selected</div>${chosen.map(row).join('')}<div class="picker-section">All</div>`;
+  } else if (!query && recent.length) {
     const recentItems = recent.map((code) => items.find((i) => i.code === code)).filter(Boolean);
     if (recentItems.length) html += `<div class="picker-section">Recent</div>${recentItems.map(row).join('')}`;
     html += '<div class="picker-section">All</div>';
@@ -247,9 +261,23 @@ pickerSearch.addEventListener('input', renderPickerList);
 pickerList.addEventListener('click', (event) => {
   const row = event.target.closest('[data-code]');
   if (!row || !pickerState) return;
-  const { onSelect } = pickerState;
-  closeSheet(picker);
-  onSelect(row.dataset.code);
+  const { onSelect, multi } = pickerState;
+  const code = row.dataset.code;
+  if (!multi) {
+    closeSheet(picker);
+    onSelect(code);
+    return;
+  }
+  if (multi.selected.includes(code)) multi.selected = multi.selected.filter((c) => c !== code);
+  else if (multi.selected.length >= multi.max) {
+    toast(`Up to ${multi.max} currencies. Untick one first.`);
+    return;
+  } else multi.selected = [...multi.selected, code];
+  const scroll = pickerList.scrollTop;
+  renderPickerTitle();
+  renderPickerList();
+  pickerList.scrollTop = scroll;
+  multi.onChange(multi.selected);
 });
 
 document.addEventListener('click', (event) => {
@@ -286,7 +314,56 @@ function renderConverterValues() {
     $('[data-clear]', input.parentElement).hidden = input.value === '';
     input.setAttribute('aria-label', `Amount in ${settings[name]}`);
   }
+  renderExtraCurrencies();
 }
+
+const MAX_EXTRA = 10;
+
+/** The amount typed, in the "price in" currency (or null if nothing is typed). */
+function sourceAmount() {
+  if (converter.value == null) return null;
+  return converter.side === 'source' ? converter.value : convert(converter.value, settings.home, settings.source);
+}
+
+function renderExtraCurrencies() {
+  const { source, home } = settings;
+  $('#extra-count').textContent = `${settings.extra.length}/${MAX_EXTRA}`;
+  const codes = settings.extra.filter((code) => code !== source && code !== home);
+  $('#extra').hidden = !codes.length;
+  if (!codes.length) return;
+  const typed = sourceAmount();
+  const amount = typed ?? 1; // with nothing typed, show what 1 unit is worth
+  $('#extra-basis').textContent = typed == null ? `per 1 ${source}` : `for ${formatMoney(typed, source)}`;
+  $('#extra-list').innerHTML = codes
+    .map((code) => {
+      const currency = getCurrency(code);
+      const glyph = symbolGlyph(currency);
+      return `<div class="extra-row">
+        <span class="sym${glyph.length > 2 ? ' long' : ''}" aria-hidden="true">${escapeHtml(glyph)}</span>
+        <span class="code">${code}</span>
+        <span class="name">${escapeHtml(currency.name)}</span>
+        <span class="val">${escapeHtml(formatMoney(convert(amount, source, code), code))}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+$('#extra-menu').addEventListener('click', () => {
+  openPicker({
+    title: 'Other currencies',
+    items: currencyItems(),
+    placeholder: 'Search currency or country',
+    multi: {
+      selected: [...settings.extra],
+      max: MAX_EXTRA,
+      onChange: (codes) => {
+        settings.extra = codes;
+        saveSettings();
+        renderExtraCurrencies();
+      },
+    },
+  });
+});
 
 function renderRateLine() {
   const { source, home } = settings;

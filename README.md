@@ -3,6 +3,7 @@
 A currency converter for your phone, with a dark, minimal mech-HUD look. Set a default currency once, and every price you type in or photograph is converted to it. Foreign text in photos is translated too.
 
 - **Default currency.** Pick your home currency and it's remembered. The converter, the quick-reference table and scanned prices all convert to it.
+- **Up to 10 other currencies.** The ☰ **Other currencies** button between the two amounts lets you tick up to 10 more currencies; whatever you type is shown in each of them too.
 - **Live camera.** Point the in-app camera at price tags or a menu and converted prices appear on screen as you move. Tap the shutter for a full scan with translation.
 - **Scan photos.** Take a photo (or pick one) of a price tag, menu or receipt. Each price is found and covered with its converted amount, right on the photo. Tap a price to fix a misread number or change its currency.
 - **Translates what it reads.** Menu items and signs are translated into your language. The **Text** view lays the translations over the photo, each price in the list shows its translated item name, and a list of every line is shown below the photo.
