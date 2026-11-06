@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v27'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v28'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -621,7 +621,7 @@ mainArea.addEventListener('pointermove', (event) => {
     }
     if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
     swipe.active = true;
-    swipe.x = event.clientX - Math.sign(dx) * 14;
+    swipe.x += Math.sign(dx) * 14; // the dead zone, so a fast flick merged into one move still counts in full
     mainArea.setPointerCapture(event.pointerId);
     document.documentElement.classList.add('swiping');
     getSelection()?.removeAllRanges();
