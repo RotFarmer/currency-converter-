@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v31'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v32'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -624,7 +624,7 @@ mainArea.addEventListener('pointerdown', (event) => {
   if (!event.isPrimary || event.pointerType === 'mouse' || drag || event.target.closest(SWIPE_IGNORE)) return;
   swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, t: event.timeStamp, dx: 0, velocity: 0, active: false };
 });
-mainArea.addEventListener('pointermove', (event) => {
+function swipeMove(event) {
   if (!swipe || event.pointerId !== swipe.id) return;
   const dx = event.clientX - swipe.x;
   const dy = event.clientY - swipe.y;
@@ -636,7 +636,11 @@ mainArea.addEventListener('pointermove', (event) => {
     if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
     swipe.active = true;
     swipe.x += Math.sign(dx) * 14; // the dead zone, so a fast flick merged into one move still counts in full
-    mainArea.setPointerCapture(event.pointerId);
+    try {
+      mainArea.setPointerCapture(event.pointerId);
+    } catch {
+      // the finger already lifted (a flick that arrived all at once)
+    }
     document.documentElement.classList.add('swiping');
     getSelection()?.removeAllRanges();
   }
@@ -645,11 +649,17 @@ mainArea.addEventListener('pointermove', (event) => {
   swipe.velocity = (raw - swipe.dx) / elapsed;
   swipe.t = event.timeStamp;
   swipe.dx = raw;
+  swipe.lastX = event.clientX;
   // At the first and last page the page only gives a little, like pulling on a rubber band.
   const hasNext = TAB_ORDER[TAB_ORDER.indexOf(currentTab) + (raw < 0 ? 1 : -1)];
   setSwipeOffset(hasNext ? raw : raw * 0.22);
+}
+mainArea.addEventListener('pointermove', swipeMove);
+mainArea.addEventListener('pointerup', (event) => {
+  // On a busy page a quick flick can arrive with no moves before the lift: the lift's position counts as one.
+  if (swipe && event.pointerId === swipe.id && event.clientX !== swipe.lastX) swipeMove(event);
+  endSwipe(event, false);
 });
-mainArea.addEventListener('pointerup', (event) => endSwipe(event, false));
 mainArea.addEventListener('pointercancel', (event) => endSwipe(event, true));
 // A swipe that moved the page isn't also a tap on whatever it started on.
 mainArea.addEventListener('click', (event) => {

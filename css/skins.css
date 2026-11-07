@@ -5708,6 +5708,26 @@
   .skin-card[data-skin-option="vapor"] .skin-preview::after { background-image: url("../img/vapor-bust-still.png"); }
 }
 
+/* ===== lv_zy_noblur.css ===== */
+/* ---------- No blur behind bars, sheets and panels ----------
+   Over the themes' moving art, a blur behind the header, tab bar, a sheet or a panel has to be worked out again
+   every frame, and on some phones (seen on a Samsung S23 Ultra in Aurora, as its sheet slid up) the graphics
+   driver then fails to draw parts of the sheet for a frame, so they flash. The see-through backgrounds that relied
+   on the blur are made more solid instead. */
+:root[data-skin] :is(.topbar, .tabbar, .sheet, .sheet-backdrop, .panel, .toast) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+:root[data-skin="aurora"] { --topbar-bg: rgba(6, 10, 28, 0.9); --tabbar-bg: rgba(8, 12, 32, 0.93); }
+:root[data-skin="aurora"][data-mode="light"] { --topbar-bg: rgba(255, 246, 251, 0.92); --tabbar-bg: rgba(255, 250, 253, 0.94); }
+:root[data-skin="aero"] { --tabbar-bg: rgba(240, 250, 255, 0.93); }
+:root[data-skin="aero"][data-mode="dark"] { --tabbar-bg: rgba(11, 34, 51, 0.93); }
+:root[data-skin="ocean"] { --topbar-bg: rgba(170, 238, 240, 0.93); }
+:root[data-skin="ocean"][data-mode="dark"] { --topbar-bg: rgba(3, 30, 48, 0.93); }
+/* Aurora's sheets were glass over a blur; without the blur the page would show through, so they're solid */
+:root[data-skin="aurora"] { --sheet-fill: rgb(16, 22, 52); }
+:root[data-skin="aurora"][data-mode="light"] { --sheet-fill: rgb(255, 255, 255); }
+
 /* ===== lv_zz_safe.css ===== */
 /* ---------- Safe mode ----------
    The Android app opens the page with ?safe=1 after it crashed: no moving or fixed theme art at all, so a theme's
