@@ -23,9 +23,12 @@ final class AppIcon {
 
     private AppIcon() {}
 
-    /** The icon for this theme ("hud" or an unknown theme: the standard icon), from the next time you leave the app. */
+    /**
+     * The icon to show: always the standard one now. Switching in theme icons (builds 16–18) left Samsung's app drawer
+     * blank, so whatever the page asks, this puts the standard icon back once you've left the app.
+     */
     static void choose(Context context, String theme) {
-        prefs(context).edit().putString("theme", theme == null ? "hud" : theme).apply();
+        prefs(context).edit().putString("theme", "hud").apply();
     }
 
     /** Whether the launcher shows another theme's icon than the chosen one. Never throws. */

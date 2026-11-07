@@ -24,7 +24,7 @@ import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, language
 import { translateLines, translateLive, translationMethod, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v38'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v39'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -59,7 +59,6 @@ const settings = {
   font: 'hud',
   fx: { scanlines: true, grid: true, glow: true },
   cameraMode: 'prices', // the live camera shows converted "prices" or "translate"s the text
-  iconFollowsTheme: true, // Android app: the launcher icon matches the theme
   recentLanguages: [], // languages scanned or translated lately, newest first (their translators are kept ready)
   ...load('settings', {}),
 };
@@ -398,14 +397,14 @@ function applyTheme() {
 
 let sentIcon = null;
 
-/** Android app: the icon in the launcher matches the theme (it changes when you leave the app). */
+/**
+ * Android app: the standard icon. Builds 16–18 could switch in the theme's icon, but swapping launcher icons left
+ * Samsung's app drawer blank, so the app asks for the standard one back (it switches when you've left the app).
+ */
 function syncAppIcon() {
-  if (!isNativeApp) return;
-  const theme = settings.iconFollowsTheme ? skinById(settings.skin).id : 'hud';
-  if (theme === sentIcon) return;
-  sentIcon = theme;
-  // Older app versions don't have this and just ignore it.
-  window.Capacitor.nativePromise('Widgets', 'setIcon', { theme }).catch(() => {
+  if (!isNativeApp || sentIcon === 'hud') return;
+  sentIcon = 'hud';
+  window.Capacitor.nativePromise('Widgets', 'setIcon', { theme: 'hud' }).catch(() => {
     sentIcon = null;
   });
 }
@@ -2569,12 +2568,6 @@ $('#translate-to').addEventListener('click', () => {
   });
 });
 
-$('#icon-toggle').addEventListener('change', (event) => {
-  settings.iconFollowsTheme = event.target.checked;
-  saveSettings();
-  syncAppIcon();
-});
-
 $('#auto-source-toggle').addEventListener('change', (event) => {
   settings.autoSource = event.target.checked;
   saveSettings();
@@ -2686,7 +2679,6 @@ function renderAll() {
   for (const el of $$('[data-name]')) el.textContent = getCurrency(settings[el.dataset.name]).name;
   $('#welcome').hidden = settings.homeChosen;
   $('#auto-source-toggle').checked = settings.autoSource;
-  $('#icon-toggle').checked = settings.iconFollowsTheme;
   renderOfflineLanguages();
   const likely = `${settings.translate}|${settings.translateTo}|${likelyLanguages().join()}`;
   if (likely !== lastLikelyLanguages) {

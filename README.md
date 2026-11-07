@@ -64,8 +64,6 @@ On Android you can install Converter as a real app, with three home-screen widge
 
    You can also long-press the app icon and tap **Live camera**.
 
-   The app's icon matches your theme: a moon over the aurora, the coat of arms for Medieval, a jellyfish for Ocean, the bust for Vapor, a gold coin for 8-bit, and so on. It changes about a minute after you leave the app (Android closes the app when its icon changes, so it waits until you're away). Some launchers take the icon off the home screen when it changes (it stays in the app list, so add it again from there); to keep the standard icon, turn off **Settings → App → Icon matches the theme**.
-
    The widgets take on your theme: its colours, its art (the forest and snow for Iron Beetle, a sunset grid for Vapor, lined paper for Notebook, gingham and lace for Cottage, parchment and corner flourishes for Medieval, and so on), its frame and border, a matching font and the shape of its keys. Iron Beetle's widgets are a dark forest green and show the country at the top. They follow your phone's light or dark mode, whatever the app itself is set to, and on Android 12 and newer they switch by themselves the moment your phone does. 90s, Vapor and 8-bit, which only come in one mode in the app, get a widget look for the other: a charcoal 90s window, a pastel-dawn Vapor and a handheld-green 8-bit. When "Price in" follows your location, they switch to the new country's currency when your phone changes time zone, even if you don't open the app. At home they use the first currency in your ☰ drawer. Tap the time in the corner (for example **3h ⟳**) to refresh the rates.
 
 Text in the app and its widgets stays the size it was designed at, whatever font size your phone is set to.
@@ -147,7 +145,7 @@ The English text model reads digits and common currency signs in any photo, so p
 
 ## Icons
 
-`icons/icon.svg` is the source: hollow green outlines on a transparent background. In the Android app each theme has its own launcher icon (`res/mipmap-*/ic_launcher_<theme>*`, drawn from the theme's art): each is an `activity-alias` of `ConverterActivity` in the manifest, and `AppIcon.java` switches on the current theme's a minute after you leave the app (`IconJobService.java`), since Android closes the app when the entry it was opened from is switched off. The standard one keeps the old `.MainActivity` name, so home-screen icons from before stay put. The PNGs are transparent too, except the Android "maskable" icon, which has a black background because Android crops home-screen icons into its own shape. iPhones show transparent home-screen icons on black.
+`icons/icon.svg` is the source: hollow green outlines on a transparent background. The Android app keeps the standard icon. Builds 16–18 could switch in a theme icon (each theme an `activity-alias` of `ConverterActivity`), but swapping launcher entries left Samsung's app drawer blank, so `AppIcon.java` now only puts the standard `.MainActivity` entry back, a minute after you leave the app (`IconJobService.java`). The PNGs are transparent too, except the Android "maskable" icon, which has a black background because Android crops home-screen icons into its own shape. iPhones show transparent home-screen icons on black.
 
 ## Exchange rates
 
