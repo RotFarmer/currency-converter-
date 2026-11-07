@@ -1,7 +1,8 @@
 // The photo-reading pipeline: find prices, work out the language, re-read text in its own script.
 // Rendering lives in app.js; this module only deals with text and boxes.
 
-import { readText, releaseWorkers, dropWorker } from './ocr.js';
+import { readText, releaseWorkers, dropWorker, lastEngine } from './ocr.js';
+import { nativeRead, nativeIdentify, scriptForCurrencies } from './native-vision.js';
 import { findPrices } from './price-parser.js';
 import {
   looksLikeOtherScript,
@@ -10,6 +11,7 @@ import {
   languageFromScript,
   detectLatinLanguage,
   modelForLanguage,
+  webOnlyScriptFor,
 } from './language.js';
 import { detectLanguageOnDevice } from './translate.js';
 
@@ -23,9 +25,9 @@ function withTimeout(promise, ms) {
 }
 
 /** Read with a script model, giving up (and skipping that model) if it fails or stalls. */
-async function readWith(canvas, model, { probe = false } = {}) {
+async function readWith(canvas, model, { probe = false, engine = 'web' } = {}) {
   try {
-    return await withTimeout(readText(canvas, null, { lang: model, probe }), probe ? PROBE_TIMEOUT_MS : READ_TIMEOUT_MS);
+    return await withTimeout(readText(canvas, null, { lang: model, probe, engine }), probe ? PROBE_TIMEOUT_MS : READ_TIMEOUT_MS);
   } catch {
     dropWorker(model);
     return null;
@@ -33,17 +35,64 @@ async function readWith(canvas, model, { probe = false } = {}) {
 }
 
 /**
- * Step 1: read prices with the English model. It handles digits and common currency signs
- * in any script. If nothing turns up, try again with a black-and-white copy, which copes
- * better with shadows and glare.
+ * Step 1: read the prices. In the Android app the phone's own reader does it, in the script the currencies
+ * suggest (each of its readers also reads digits and Latin letters). Otherwise the web reader's English model,
+ * which handles digits and common currency signs in any script; if nothing turns up, it tries again with a
+ * black-and-white copy, which copes better with shadows and glare.
+ * @returns {{lines, prices, engine: 'device'|'web', script: string}}
  */
-export async function readPrices(canvas, parseOptions, onProgress) {
-  const lines = await readText(canvas, (m) => onProgress(m, false));
+export async function readPrices(canvas, parseOptions, onProgress, { hints = [] } = {}) {
+  const script = scriptForCurrencies(hints);
+  const lines = await readText(canvas, (m) => onProgress(m, false), { script });
   const prices = findPrices(lines, parseOptions);
-  if (prices.length) return { lines, prices };
-  const retryLines = await readText(canvas, (m) => onProgress(m, true), { mode: 'threshold' });
+  if (lastEngine === 'device') return { lines, prices, engine: 'device', script };
+  if (prices.length) return { lines, prices, engine: 'web', script: 'eng' };
+  const retryLines = await readText(canvas, (m) => onProgress(m, true), { mode: 'threshold', engine: 'web' });
   const retryPrices = findPrices(retryLines, parseOptions);
-  return retryPrices.length ? { lines: retryLines, prices: retryPrices } : { lines, prices };
+  const result = retryPrices.length ? { lines: retryLines, prices: retryPrices } : { lines, prices };
+  return { ...result, engine: 'web', script: 'eng' };
+}
+
+const KANA = /[\u3040-\u30ff]/u;
+const HAN = /[\u4e00-\u9fff]/u;
+const HANGUL = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/u;
+const DEVANAGARI = /[\u0900-\u097f]/u;
+const textOf = (lines) => lines.map((line) => line.text).join('\n');
+const count = (text, pattern) => [...text].filter((ch) => pattern.test(ch)).length;
+const letters = (lines) => count(textOf(lines), /\p{L}/u);
+const cjk = (lines) => count(textOf(lines), /[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]/u);
+
+/**
+ * Work out the language with the phone's reader. Its readers skip scripts they don't know (rather than misreading
+ * them, as the web reader does), so when the Latin reader found little, the Japanese and Korean readers have a
+ * look too. CJK and Devanagari text is recognised by its characters; Latin-alphabet text by the phone's language
+ * identification. @returns {Promise<{lang, model, lines}|null>} null if cancelled
+ */
+async function identifyOnDevice(canvas, lines, script, hintCurrencies, isCancelled) {
+  let best = { script, lines };
+  if (script === 'latin' && letters(lines) < 40) {
+    for (const other of ['japanese', 'korean']) {
+      if (isCancelled()) return null;
+      const read = await nativeRead(canvas, other).catch(() => null);
+      if (read && cjk(read) > cjk(best.lines) + 3) best = { script: other, lines: read };
+    }
+  }
+  const text = textOf(best.lines);
+  let lang = null;
+  if (KANA.test(text)) lang = 'ja';
+  else if (HANGUL.test(text)) lang = 'ko';
+  else if (HAN.test(text)) lang = hintCurrencies.some((c) => ['TWD', 'HKD', 'MOP'].includes(c)) ? 'zh-TW' : 'zh';
+  else if (DEVANAGARI.test(text)) lang = 'hi';
+  const wanted = { ja: 'japanese', ko: 'korean', zh: 'chinese', 'zh-TW': 'chinese', hi: 'devanagari' }[lang];
+  if (wanted && wanted !== best.script) {
+    if (isCancelled()) return null;
+    const read = await nativeRead(canvas, wanted).catch(() => null);
+    if (read) best = { script: wanted, lines: read };
+  }
+  if (!lang && letters(best.lines) >= 6) {
+    lang = (await nativeIdentify(text)) || (await detectLanguageOnDevice(text)) || detectLatinLanguage(text);
+  }
+  return { lang, model: best.script, lines: best.lines };
 }
 
 /**
@@ -53,7 +102,21 @@ export async function readPrices(canvas, parseOptions, onProgress) {
  * currency hints) and the one that reads the text best wins.
  * @returns {Promise<{lang: string|null, model: string, lines: object[]} | null>} null if cancelled
  */
-export async function identifyLanguage(canvas, englishLines, { hintCurrencies = [], onProbe, isCancelled }) {
+export async function identifyLanguage(canvas, englishLines, { hintCurrencies = [], onProbe, isCancelled, engine = 'web', script = 'eng' }) {
+  if (engine !== 'device') return identifyLanguageWeb(canvas, englishLines, { hintCurrencies, onProbe, isCancelled });
+  const device = await identifyOnDevice(canvas, englishLines, script, hintCurrencies, isCancelled);
+  if (!device) return null;
+  const webScript = webOnlyScriptFor(hintCurrencies);
+  if (device.lang && !webScript) return device;
+  // The phone doesn't read Thai, Hebrew, Arabic, Cyrillic or Greek: the web reader works those out (slower).
+  const webLines = await readWith(canvas, 'eng');
+  if (!webLines || isCancelled()) return isCancelled() ? null : device;
+  const web = await identifyLanguageWeb(canvas, webLines, { hintCurrencies, onProbe, isCancelled });
+  if (!web) return null;
+  return web.lang ? web : device;
+}
+
+async function identifyLanguageWeb(canvas, englishLines, { hintCurrencies = [], onProbe, isCancelled }) {
   const unknown = { lang: null, model: 'eng', lines: englishLines };
   let candidates;
   let minScore = MIN_SCORE;
@@ -110,10 +173,10 @@ export async function identifyLanguage(canvas, englishLines, { hintCurrencies = 
   return { lang, model, lines };
 }
 
-/** Read the text again with the model for a language the user picked. */
+/** Read the text again with the model for a language the user picked (on the phone when it reads that script). */
 export async function readInLanguage(canvas, lang, englishLines) {
   const model = modelForLanguage(lang);
-  const lines = model === 'eng' ? englishLines : await readWith(canvas, model);
+  const lines = model === 'eng' ? englishLines : await readWith(canvas, model, { engine: 'auto' });
   if (!lines) throw new Error(`Couldn’t load the ${lang} text model`);
   releaseWorkers([model]);
   return { lang, model, lines };

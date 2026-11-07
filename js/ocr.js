@@ -1,6 +1,10 @@
-// Reads text from photos with Tesseract.js. Everything runs on the phone; the photo is never uploaded.
+// Reads text from photos. Inside the Android app it uses the phone's own text reader (js/native-vision.js), which is
+// much faster and more accurate; otherwise, and for scripts the phone doesn't read, Tesseract.js in the page.
+// Everything runs on the phone; the photo is never uploaded.
 // The library and English model (~6 MB) download on first use; other scripts (Japanese, Thai, …)
 // add 1–3 MB each, only when a photo needs them. Everything is cached afterwards.
+
+import { nativeRead, scriptForModel } from './native-vision.js';
 
 const TESSERACT_VERSION = '7.0.0';
 const CDN = 'https://cdn.jsdelivr.net/npm';
@@ -17,6 +21,8 @@ const MIN_SIDE = 1000; // small screenshots are upscaled, which helps recognitio
 const PROBE_SIDE = 1000; // smaller copy used when trying out language models
 
 const workers = new Map(); // OCR model → Promise<worker>
+/** Which reader read the last text: 'device' (the app's) or 'web' (Tesseract). */
+export let lastEngine = 'web';
 let libraryPromise = null;
 let progressListener = null;
 
@@ -189,11 +195,28 @@ function scaledCopy(canvas, maxSide) {
 
 /**
  * Recognise text in a canvas.
- * @param {object} options  mode: "gray" | "threshold"; lang: Tesseract model; probe: use a small copy
+ * @param {object} options  mode: "gray" | "threshold"; lang: Tesseract model; probe: use a small copy;
+ *   script: the device reader's script to use (latin, japanese, chinese, korean, devanagari), else from lang;
+ *   engine: "auto" (the device's reader when it reads that script) or "web" (always Tesseract)
  * @returns {Promise<{text:string, bbox:object, words:{text:string,bbox:object,confidence:number}[]}[]>}
  *   lines of words, with boxes in the canvas's own pixel coordinates
  */
-export async function readText(canvas, onProgress, { mode = 'gray', lang = 'eng', probe = false } = {}) {
+export async function readText(canvas, onProgress, { mode = 'gray', lang = 'eng', probe = false, script = null, engine = 'auto', maxSide } = {}) {
+  if (engine !== 'web') {
+    const deviceScript = script || scriptForModel(lang);
+    if (deviceScript) {
+      try {
+        const lines = await nativeRead(canvas, deviceScript, maxSide ? { maxSide } : undefined);
+        if (lines) {
+          lastEngine = 'device';
+          return lines;
+        }
+      } catch {
+        // the web reader below takes over
+      }
+    }
+  }
+  lastEngine = 'web';
   progressListener = onProgress;
   try {
     const worker = await getWorker(lang);

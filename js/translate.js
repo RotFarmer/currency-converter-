@@ -1,12 +1,18 @@
 // Translates lines of text recognised in photos.
-// Uses the browser's on-device translator when it's ready (recent desktop Chrome);
-// otherwise the free MyMemory service (no key, roughly 5,000 characters a day per device).
-// Only the recognised text is sent, never the photo.
+// In the Android app it translates on the phone (fast, unlimited, offline once a language is downloaded); then the
+// browser's on-device translator when it's ready (recent desktop Chrome); otherwise the free MyMemory service (no
+// key, roughly 5,000 characters a day per device). Only the recognised text is sent, never the photo.
+
+import { nativeTranslate } from './native-vision.js';
 
 const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
 const MAX_BYTES = 450; // MyMemory accepts up to 500 bytes per request
 const TIMEOUT_MS = 12000;
 const cache = new Map();
+/** How the last translation was done: 'device', 'browser', 'online', or 'downloading' (online while the phone
+ * downloads the language). */
+let lastMethod = '';
+export const translationMethod = () => lastMethod;
 
 const baseLanguage = (code) => String(code || '').split('-')[0].toLowerCase();
 
@@ -23,12 +29,18 @@ export async function translateLines(lines, from, to) {
   if (baseLanguage(from) === baseLanguage(to) && from !== 'zh-TW') return lines.slice();
   const key = (line) => `${from}|${to}|${line}`;
   const missing = [...new Set(lines.filter((line) => !cache.has(key(line))))];
+  const fresh = new Map();
   if (missing.length) {
     const translate = await pickTranslator(from, to);
     const results = await translate(missing);
-    missing.forEach((line, i) => cache.set(key(line), results[i] || line));
+    // Online stand-ins while the phone downloads the language aren't kept: next time the phone translates.
+    const keep = lastMethod !== 'downloading';
+    missing.forEach((line, i) => {
+      fresh.set(line, results[i] || line);
+      if (keep) cache.set(key(line), results[i] || line);
+    });
   }
-  return lines.map((line) => cache.get(key(line)));
+  return lines.map((line) => cache.get(key(line)) ?? fresh.get(line));
 }
 
 // Built-in browser AI APIs can stall (e.g. while a model loads), so they get a time limit.
@@ -37,6 +49,59 @@ function withTimeout(promise, ms) {
 }
 
 async function pickTranslator(from, to) {
+  const fallback = await webTranslator(from, to);
+  return async (texts) => {
+    const device = await nativeTranslate(texts, from, to);
+    if (device?.status === 'done' && device.translations?.length === texts.length) {
+      lastMethod = 'device';
+      return device.translations;
+    }
+    const results = await fallback(texts);
+    if (device?.status === 'downloading') lastMethod = 'downloading';
+    return results;
+  };
+}
+
+/** The browser's on-device translator for these languages, if it has one ready; null otherwise. */
+async function browserTranslator(from, to) {
+  if (typeof self.Translator?.availability !== 'function') return null;
+  try {
+    const options = { sourceLanguage: from, targetLanguage: to };
+    if ((await withTimeout(self.Translator.availability(options), 2000)) !== 'available') return null;
+    return await withTimeout(self.Translator.create(options), 4000);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Translate for the live camera: on the phone (or the browser's own translator) only, since every frame can bring
+ * new lines and the online service has a daily limit. Uses and fills the same cache.
+ * @returns {Promise<{status: 'done'|'downloading'|'unavailable', translations?: string[]}>}
+ */
+export async function translateLive(lines, from, to) {
+  if (baseLanguage(from) === baseLanguage(to) && from !== 'zh-TW') return { status: 'done', translations: lines.slice() };
+  const key = (line) => `${from}|${to}|${line}`;
+  const missing = [...new Set(lines.filter((line) => !cache.has(key(line))))];
+  if (missing.length) {
+    const device = await nativeTranslate(missing, from, to);
+    let results = device?.status === 'done' ? device.translations : null;
+    if (!results && device?.status === 'downloading') return { status: 'downloading' };
+    if (!results) {
+      const browser = await browserTranslator(from, to);
+      if (!browser) return { status: 'unavailable' };
+      try {
+        results = await withTimeout(Promise.all(missing.map((text) => browser.translate(text))), 10000);
+      } catch {
+        return { status: 'unavailable' };
+      }
+    }
+    missing.forEach((line, i) => cache.set(key(line), results[i] || line));
+  }
+  return { status: 'done', translations: lines.map((line) => cache.get(key(line))) };
+}
+
+async function webTranslator(from, to) {
   if (typeof self.Translator?.availability === 'function') {
     try {
       const options = { sourceLanguage: from, targetLanguage: to };
@@ -44,8 +109,11 @@ async function pickTranslator(from, to) {
         const translator = await withTimeout(self.Translator.create(options), 4000);
         return async (texts) => {
           try {
-            return await withTimeout(Promise.all(texts.map((text) => translator.translate(text))), 10000);
+            const results = await withTimeout(Promise.all(texts.map((text) => translator.translate(text))), 10000);
+            lastMethod = 'browser';
+            return results;
           } catch {
+            lastMethod = 'online';
             return translateOnline(texts, from, to);
           }
         };
@@ -54,7 +122,10 @@ async function pickTranslator(from, to) {
       /* fall back to the online service */
     }
   }
-  return (texts) => translateOnline(texts, from, to);
+  return (texts) => {
+    lastMethod = 'online';
+    return translateOnline(texts, from, to);
+  };
 }
 
 const encoder = new TextEncoder();

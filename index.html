@@ -548,6 +548,10 @@
     <video id="camera-video" playsinline muted autoplay></video>
     <div class="camera-frame" aria-hidden="true"></div>
     <div class="camera-tags" id="camera-tags" aria-live="polite"></div>
+    <div class="cam-modes" id="camera-modes" role="group" aria-label="Show" hidden>
+      <button type="button" data-cam-mode="prices" aria-pressed="true">Prices</button>
+      <button type="button" data-cam-mode="translate" aria-pressed="false">Translate</button>
+    </div>
     <div class="camera-top">
       <span class="live-badge">Live</span>
       <span class="camera-status" id="camera-status">Starting camera…</span>

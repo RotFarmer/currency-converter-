@@ -26,6 +26,18 @@ const CURRENCY_SCRIPT = {
   OMR: 'ara', JOD: 'ara', MAD: 'ara', TND: 'ara', DZD: 'ara', LBP: 'ara', IQD: 'ara', IRR: 'ara', PKR: 'ara',
 };
 
+/**
+ * A script the phone's own reader can't read (Thai, Hebrew, Arabic, Cyrillic, Greek) that these currencies
+ * suggest, as a web text model; null if none does.
+ */
+export function webOnlyScriptFor(currencies = []) {
+  for (const code of currencies) {
+    const model = CURRENCY_SCRIPT[code];
+    if (['tha', 'heb', 'ara', 'rus', 'ell'].includes(model)) return model;
+  }
+  return null;
+}
+
 /** Order in which to try script models: hints from currencies first, then the usual order. */
 export function scriptCandidates(hintCurrencies = []) {
   const ordered = [];

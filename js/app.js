@@ -15,15 +15,16 @@ import { ACCENT_PRESETS, SKINS, accentPalette, skinById, toCssText } from './the
 import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, parseAmountEntry, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
-import { photoToCanvas, preloadOcr, readText } from './ocr.js';
+import { photoToCanvas, preloadOcr, readText, lastEngine } from './ocr.js';
+import { nativeVision, nativeIdentify, scriptForCurrencies } from './native-vision.js';
 import { cameraSupported, startCamera, stopCamera, torchSupported, setTorch, grabFrame } from './camera.js';
 import { readPrices, identifyLanguage, readInLanguage, mergePrices } from './scan.js';
 import { textLines, labelFor } from './layout.js';
-import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
-import { translateLines, googleTranslateUrl } from './translate.js';
+import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
+import { translateLines, translateLive, translationMethod, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v32'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v33'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -57,6 +58,7 @@ const settings = {
   accent: 'default', // a preset id or a custom "#rrggbb"
   font: 'hud',
   fx: { scanlines: true, grid: true, glow: true },
+  cameraMode: 'prices', // the live camera shows converted "prices" or "translate"s the text
   ...load('settings', {}),
 };
 if (settings.skin === 'frostmire') settings.skin = 'ironbeetle'; // renamed theme
@@ -373,8 +375,8 @@ function applyTheme() {
   if (!fx.glow && color) palettes.dark['--glow'] = palettes.light['--glow'] = 'transparent';
   // Accent colour and effects belong to the HUD theme; the other themes bring their own.
   root.style.cssText = hud ? toCssText(dark ? palettes.dark : palettes.light) : '';
-  // The camera and scanning overlay always use the dark colours.
-  for (const el of [$('#camera'), $('#scan-progress')]) el.style.cssText = toCssText(palettes.dark);
+  // In HUD the camera and scanning overlay always use the dark colours; the other themes bring their own.
+  for (const el of [$('#camera'), $('#scan-progress')]) el.style.cssText = hud ? toCssText(palettes.dark) : '';
   // Remembered so the next launch can apply it before the page draws.
   save('themeCache', { dark: toCssText(palettes.dark), light: toCssText(palettes.light) });
 
@@ -1487,12 +1489,15 @@ async function recognise(run) {
   });
   renderScan();
   try {
-    const { lines, prices } = await readPrices(photo, parseOptions(), ({ status, progress }, retry) => {
+    setProgress('Reading prices…', 0.2);
+    const { lines, prices, engine, script } = await readPrices(photo, parseOptions(), ({ status, progress }, retry) => {
       if (run !== scan.run) return;
       if (!retry) setProgress(OCR_STEPS[status] || 'Getting ready…', progress);
       else if (status === 'recognizing text') setProgress('Looking more closely…', progress);
     });
     if (run !== scan.run) return;
+    scan.readEngine = engine;
+    scan.readScript = script;
     scan.englishLines = lines;
     scan.englishPrices = prices;
     setItems(prices);
@@ -1535,6 +1540,8 @@ async function analyseLanguage(run, forcedLang = null) {
     } else {
       result = await identifyLanguage(photo, scan.englishLines, {
         hintCurrencies: [...scan.englishPrices.flatMap((p) => p.candidates || []), settings.source],
+        engine: scan.readEngine,
+        script: scan.readScript,
         isCancelled: () => !live(),
         onProbe: (index, total) => {
           if (!live()) return;
@@ -1546,7 +1553,8 @@ async function analyseLanguage(run, forcedLang = null) {
     if (!result || !live()) return;
     scan.language = result.lang;
     if (!scan.edited) {
-      const scriptPrices = result.model === 'eng' ? [] : findPrices(result.lines, parseOptions());
+      // Prices read again in the text's own script (the first read was English/Latin already).
+      const scriptPrices = ['eng', 'latin'].includes(result.model) ? [] : findPrices(result.lines, parseOptions());
       setItems(mergePrices(scan.englishPrices, scriptPrices));
     }
     scan.lines = textLines(result.lines, scan.items.map((item) => item.bbox));
@@ -1614,6 +1622,14 @@ function renderScan() {
   renderTranslationCard();
 }
 
+/** How the scan was translated, for the language bar. */
+function translationNote() {
+  const method = translationMethod();
+  if (method === 'device') return ' on your phone';
+  if (method === 'downloading') return ` online (downloading ${languageName(scan.language)} for offline use)`;
+  return '';
+}
+
 function renderLanguageBar() {
   const bar = $('#lang-bar');
   bar.hidden = scan.status !== 'done';
@@ -1633,7 +1649,7 @@ function renderLanguageBar() {
   else if (scan.langStatus === 'failed') [text, state] = ['Couldn’t identify the language. Tap LANG to choose.', 'error'];
   else if (scan.langStatus === 'none') text = 'Language not recognised. Tap LANG to choose.';
   else if (scan.translateStatus === 'busy') [text, state] = [`Translating to ${languageName(settings.translateTo)}…`, 'busy'];
-  else if (scan.translateStatus === 'done') text = `Translated to ${languageName(settings.translateTo)}`;
+  else if (scan.translateStatus === 'done') text = `Translated to ${languageName(settings.translateTo)}${translationNote()}`;
   else if (scan.translateStatus === 'same') text = `Already in ${languageName(settings.translateTo)}`;
   else if (scan.translateStatus === 'off') text = 'Translation is off (Settings)';
   else if (scan.translateStatus === 'failed') [text, state] = [`Translation failed: ${scan.translateError}`, 'error'];
@@ -1829,16 +1845,57 @@ $('#lang-button').addEventListener('click', () => {
 $('#lang-set-local').addEventListener('click', () => setCurrency('source', photoCurrency().code));
 
 /* ---------- Live camera ---------- */
-// Reads prices from the camera feed a frame at a time and pins converted amounts on screen.
-// The shutter hands the current frame to the full scan (language, translation, editing).
+// Reads the camera feed a frame at a time. Prices: converted amounts pinned over each price. Translate: each line
+// of text with its translation laid over it. In the Android app the phone's own reader does this several times a
+// second. A price (or line) has to be read in more than one frame before it shows, and where two readings of the
+// same spot disagree the one read most often wins, so misreads don't flicker by. The shutter hands the current
+// frame to the full scan (language, translation, editing).
 
 const cameraEl = $('#camera');
 const video = $('#camera-video');
-const live = { session: 0, items: [], frameW: 1, frameH: 1, torch: false };
-const LIVE_SIDE = 1000; // frame size for live reading: smaller is faster
+const live = {
+  session: 0,
+  frame: 0, // frames read this session
+  frameW: 1,
+  frameH: 1,
+  torch: false,
+  mode: settings.cameraMode === 'translate' ? 'translate' : 'prices',
+  priceTracks: [], // prices followed from frame to frame
+  shownPrices: [],
+  items: [], // the prices on screen now
+  lineTracks: [], // lines of text followed from frame to frame (translate mode)
+  lang: null, // the language being translated
+  langCandidate: null,
+  langCheckedAt: 0,
+  probe: 0,
+  translations: new Map(), // "lang|text" → translation
+  translating: false,
+  translateState: '',
+  retryAt: 0,
+};
+const LIVE_SIDE = 1000; // frame size for the web reader: smaller is faster
+const LIVE_SIDE_DEVICE = 1280; // the phone's reader is fast enough for more detail
+let liveTrackId = 0;
+
+const liveSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
+const boxCenter = (b) => [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
+const boxArea = (b) => Math.max(1, (b.x1 - b.x0) * (b.y1 - b.y0));
+const lerpBox = (a, b, t) => ({ x0: a.x0 + (b.x0 - a.x0) * t, y0: a.y0 + (b.y0 - a.y0) * t, x1: a.x1 + (b.x1 - a.x1) * t, y1: a.y1 + (b.y1 - a.y1) * t });
+/** How much of the smaller box the other one covers (0–1). */
+function overlapShare(a, b) {
+  const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+  const h = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+  return w <= 0 || h <= 0 ? 0 : (w * h) / Math.min(boxArea(a), boxArea(b));
+}
 
 function setCameraStatus(text) {
   $('#camera-status').textContent = text;
+}
+
+/** Live translation needs the phone's own translator (the Android app): it's fast and works without a daily limit. */
+async function liveTranslateAvailable() {
+  return Boolean((await nativeVision())?.translate);
 }
 
 async function openCamera() {
@@ -1847,8 +1904,13 @@ async function openCamera() {
     return;
   }
   const session = ++live.session;
-  Object.assign(live, { items: [], torch: false });
-  renderLiveTags();
+  Object.assign(live, { priceTracks: [], shownPrices: [], items: [], lineTracks: [], torch: false, lang: null, langCandidate: null, probe: 0, translateState: '', retryAt: 0 });
+  $('#camera-tags').replaceChildren();
+  renderCameraMode();
+  liveTranslateAvailable().then((available) => {
+    $('#camera-modes').hidden = !available;
+    if (!available && live.mode === 'translate') setCameraMode('prices', false);
+  });
   setCameraStatus('Starting camera…');
   $('#camera-torch').hidden = true;
   openSheet(cameraEl);
@@ -1870,64 +1932,317 @@ async function openCamera() {
   liveLoop(session);
 }
 
+/** The phone reader's script for this frame: the text's own once its language is known. */
+function liveScript() {
+  const byLanguage = { ja: 'japanese', ko: 'korean', zh: 'chinese', 'zh-TW': 'chinese', hi: 'devanagari' }[live.lang];
+  if (byLanguage) return byLanguage;
+  const byCurrency = scriptForCurrencies([settings.source]);
+  if (live.mode !== 'translate' || live.lang) return byCurrency;
+  // Text in an unknown script: every few frames look with the Japanese and Korean readers too, which find CJK text
+  // the Latin reader skips.
+  live.probe = (live.probe + 1) % 3;
+  return [byCurrency, 'japanese', 'korean'][live.probe];
+}
+
 async function liveLoop(session) {
   const frame = document.createElement('canvas');
+  const device = Boolean(await nativeVision());
   let first = true;
-  setCameraStatus(ocrWarm ? 'Point at prices' : 'Loading text reader…');
+  setCameraStatus(device || ocrWarm ? 'Point at prices' : 'Loading text reader…');
   while (session === live.session) {
     if (video.readyState < 2 || !video.videoWidth || document.hidden) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await liveSleep(250);
       continue;
     }
-    grabFrame(video, frame, LIVE_SIDE);
+    const startedAt = performance.now();
+    grabFrame(video, frame, device ? LIVE_SIDE_DEVICE : LIVE_SIDE);
     cameraEl.classList.add('reading');
     try {
-      const lines = await readText(frame, first ? ({ status }) => {
-        if (session === live.session && status !== 'recognizing text') setCameraStatus('Loading text reader (first time only)…');
-      } : null);
+      const onProgress = first && !device
+        ? ({ status }) => {
+            if (session === live.session && status !== 'recognizing text') setCameraStatus('Loading text reader (first time only)…');
+          }
+        : null;
+      const lines = await readText(frame, onProgress, { script: liveScript(), maxSide: LIVE_SIDE_DEVICE });
       if (session !== live.session) return;
       first = false;
       ocrWarm = true;
-      live.items = findPrices(lines, parseOptions());
+      live.frame += 1;
       live.frameW = frame.width;
       live.frameH = frame.height;
-      const count = live.items.length;
-      if (count) live.lastSeen = { at: Date.now(), items: live.items };
-      setCameraStatus(count ? `${count} price${count === 1 ? '' : 's'}` : 'Point at prices');
-      renderLiveTags();
+      const fast = lastEngine === 'device';
+      const prices = findPrices(lines, parseOptions());
+      trackPrices(prices, fast);
+      if (live.mode === 'translate') {
+        trackLines(lines, prices, fast);
+        liveLanguage(lines);
+        requestLiveTranslations();
+      }
+      if (live.items.length) live.lastSeen = { at: Date.now(), items: live.items };
+      renderLive();
+      updateLiveStatus();
     } catch {
       if (session !== live.session) return;
       setCameraStatus('Text reader unavailable offline. You can still capture.');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await liveSleep(2000);
     } finally {
       cameraEl.classList.remove('reading');
     }
+    // Let the screen show this frame's tags before reading the next, and no more than about 12 frames a second
+    // (plenty for the tags to follow the camera, and easier on the battery).
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    const spare = 80 - (performance.now() - startedAt);
+    if (spare > 0) await liveSleep(spare);
   }
 }
 
-function renderLiveTags() {
+/** Follow prices from frame to frame: the same amount near the same place is the same price. */
+function trackPrices(prices, fast) {
+  const now = performance.now();
+  for (const price of prices) {
+    const [cx, cy] = boxCenter(price.bbox);
+    const reach = Math.max(price.bbox.x1 - price.bbox.x0, (price.bbox.y1 - price.bbox.y0) * 3);
+    let best = null;
+    let bestDistance = Infinity;
+    for (const track of live.priceTracks) {
+      if (track.frame === live.frame || track.item.amount !== price.amount) continue;
+      const [tx, ty] = boxCenter(track.bbox);
+      const distance = Math.hypot(tx - cx, ty - cy);
+      if (distance < reach && distance < bestDistance) [best, bestDistance] = [track, distance];
+    }
+    if (best) {
+      best.bbox = lerpBox(best.bbox, price.bbox, 0.65);
+      best.item = { ...price, bbox: best.bbox };
+      best.hits += 1;
+      best.frame = live.frame;
+      best.seenAt = now;
+    } else {
+      live.priceTracks.push({ id: ++liveTrackId, bbox: price.bbox, item: price, hits: 1, frame: live.frame, seenAt: now });
+    }
+  }
+  live.priceTracks = live.priceTracks.filter((track) => now - track.seenAt < (fast ? 800 : 3000));
+  // Show prices read more than once (one sure reading is enough for the slower web reader). Where two readings of
+  // the same spot disagree, the one read most often wins.
+  const shown = [];
+  for (const track of [...live.priceTracks].sort((a, b) => b.hits - a.hits)) {
+    const enough = track.hits >= 2 || (!fast && track.item.confidence === 'high');
+    if (enough && !shown.some((other) => overlapShare(other.bbox, track.bbox) > 0.4)) shown.push(track);
+  }
+  live.shownPrices = shown;
+  live.items = shown.map((track) => track.item);
+}
+
+/** Follow lines of text (not just a price) from frame to frame by where they are. */
+function trackLines(lines, prices, fast) {
+  const now = performance.now();
+  for (const line of lines) {
+    const text = line.text.replace(/\s+/g, ' ').trim();
+    if ((text.match(/\p{L}/gu) || []).length < 2) continue;
+    const width = line.bbox.x1 - line.bbox.x0;
+    if (prices.some((p) => overlapShare(p.bbox, line.bbox) > 0.6 && p.bbox.x1 - p.bbox.x0 > width * 0.6)) continue;
+    let best = null;
+    let bestShare = 0.35;
+    for (const track of live.lineTracks) {
+      if (track.frame === live.frame) continue;
+      const share = overlapShare(track.bbox, line.bbox);
+      if (share > bestShare) [best, bestShare] = [track, share];
+    }
+    if (best) {
+      best.bbox = lerpBox(best.bbox, line.bbox, 0.65);
+      best.text = text;
+      best.hits += 1;
+      best.frame = live.frame;
+      best.seenAt = now;
+    } else {
+      live.lineTracks.push({ id: ++liveTrackId, bbox: line.bbox, text, hits: 1, frame: live.frame, seenAt: now, shown: '' });
+    }
+  }
+  live.lineTracks = live.lineTracks.filter((track) => now - track.seenAt < (fast ? 900 : 3000));
+}
+
+/** A language recognised from its script alone, or null for Latin-alphabet text. */
+function scriptLanguage(text) {
+  if (/[぀-ヿ]/u.test(text)) return 'ja';
+  if (/[가-힯]/u.test(text)) return 'ko';
+  if (/[一-鿿]/u.test(text)) return ['TWD', 'HKD', 'MOP'].includes(settings.source) ? 'zh-TW' : 'zh';
+  if (/[ऀ-ॿ]/u.test(text)) return 'hi';
+  if (/[฀-๿]/u.test(text)) return 'th';
+  if (/[֐-׿]/u.test(text)) return 'he';
+  if (/[؀-ۿ]/u.test(text)) return 'ar';
+  if (/[Ѐ-ӿ]/u.test(text)) return 'ru';
+  if (/[Ͱ-Ͽ]/u.test(text)) return 'el';
+  return null;
+}
+
+/** Work out (about once a second) the language of the text in view. */
+function liveLanguage(lines) {
+  const now = performance.now();
+  if (now - live.langCheckedAt < 1200) return;
+  live.langCheckedAt = now;
+  const steady = live.lineTracks.filter((track) => track.hits >= 2).map((track) => track.text).join('\n');
+  const text = steady || lines.map((line) => line.text).join('\n');
+  const byScript = scriptLanguage(text);
+  if (byScript) {
+    setLiveLanguage(byScript);
+  } else if ((text.match(/\p{L}/gu) || []).length >= 12) {
+    const session = live.session;
+    nativeIdentify(text).then((lang) => {
+      if (session === live.session) setLiveLanguage(lang || detectLatinLanguage(text));
+    });
+  }
+}
+
+function setLiveLanguage(lang) {
+  if (!lang || lang === live.lang) {
+    live.langCandidate = null;
+    return;
+  }
+  // A different language has to come up twice in a row before it takes over.
+  if (!live.lang || live.langCandidate === lang) {
+    live.lang = lang;
+    live.langCandidate = null;
+    live.translateState = '';
+    live.retryAt = 0;
+  } else {
+    live.langCandidate = lang;
+  }
+}
+
+const liveTranslation = (text) => live.translations.get(`${live.lang}|${text}`);
+
+/** Translate the lines in view that have no translation yet, a batch at a time. */
+async function requestLiveTranslations() {
+  if (live.translating || !live.lang || performance.now() < live.retryAt) return;
+  const from = live.lang;
+  const to = settings.translateTo;
+  if (baseLanguage(from) === baseLanguage(to)) return;
+  const missing = [...new Set(live.lineTracks.filter((track) => track.hits >= 2 && !liveTranslation(track.text)).map((track) => track.text))].slice(0, 30);
+  if (!missing.length) return;
+  const session = live.session;
+  live.translating = true;
+  try {
+    const result = await translateLive(missing, from, to);
+    if (session !== live.session) return;
+    live.translateState = result.status;
+    if (result.status === 'done') missing.forEach((text, i) => live.translations.set(`${from}|${text}`, result.translations[i]));
+    else live.retryAt = performance.now() + 3000; // downloading or unavailable: look again in a moment
+  } catch {
+    live.translateState = 'unavailable';
+    live.retryAt = performance.now() + 3000;
+  } finally {
+    live.translating = false;
+  }
+  if (session === live.session) {
+    renderLive();
+    updateLiveStatus();
+  }
+}
+
+function updateLiveStatus() {
+  const count = live.items.length;
+  const prices = count ? `${count} price${count === 1 ? '' : 's'}` : '';
+  if (live.mode !== 'translate') {
+    setCameraStatus(prices || 'Point at prices');
+    return;
+  }
+  const to = languageName(settings.translateTo);
+  let text;
+  if (!live.lang) text = 'Point at text to translate';
+  else if (baseLanguage(live.lang) === baseLanguage(settings.translateTo)) text = `Already in ${to}`;
+  else if (live.translateState === 'downloading') text = `Getting ${languageName(live.lang)} ready (once, about 30 MB)…`;
+  else if (live.translateState === 'unavailable') text = `${languageName(live.lang)} can’t be translated live: use the shutter`;
+  else text = `${languageName(live.lang)} → ${to}`;
+  setCameraStatus(prices ? `${text} · ${prices}` : text);
+}
+
+/** Lay the translations and the converted prices over the video, moving the ones already there. */
+function renderLive() {
   // The video fills the screen with object-fit: cover, so map frame pixels the same way.
   const cw = cameraEl.clientWidth;
   const ch = cameraEl.clientHeight;
   const scale = Math.max(cw / live.frameW, ch / live.frameH);
   const ox = (cw - live.frameW * scale) / 2;
   const oy = (ch - live.frameH * scale) / 2;
-  $('#camera-tags').innerHTML = live.items
-    .map((item) => {
-      const { x0, y0, x1, y1 } = item.bbox;
-      const h = (y1 - y0) * scale;
-      const converted = formatMoney(convert(item.amount, currencyOf(item, live.items, null), settings.home), settings.home);
-      const style = [
-        `left:${ox + ((x0 + x1) / 2) * scale}px`,
-        `top:${oy + ((y0 + y1) / 2) * scale}px`,
-        `min-width:${(x1 - x0) * scale * 1.08 + 8}px`,
-        `min-height:${h * 1.12 + 4}px`,
-        `font-size:${Math.max(13, Math.min(32, h * 0.75))}px`,
-      ].join(';');
-      return `<div class="live-tag${item.confidence === 'low' ? ' low' : ''}" style="${style}">${escapeHtml(converted)}</div>`;
-    })
-    .join('');
+  const place = (b) => ({ x: ox + ((b.x0 + b.x1) / 2) * scale, y: oy + ((b.y0 + b.y1) / 2) * scale, w: (b.x1 - b.x0) * scale, h: (b.y1 - b.y0) * scale });
+  const wanted = new Map();
+  if (live.mode === 'translate') {
+    for (const track of live.lineTracks) {
+      const translated = liveTranslation(track.text);
+      if (translated) track.shown = translated;
+      if (track.hits < 2 || !track.shown) continue;
+      const { x, y, w, h } = place(track.bbox);
+      wanted.set(`l${track.id}`, {
+        className: 'live-line',
+        text: track.shown,
+        x,
+        y,
+        fit: true,
+        style: `min-width:${Math.min(w, cw - 12)}px;min-height:${h}px;font-size:${clampNumber(h * 0.62, 11, 26)}px`,
+      });
+    }
+  }
+  for (const track of live.shownPrices) {
+    const { item } = track;
+    const { x, y, w, h } = place(track.bbox);
+    wanted.set(`p${track.id}`, {
+      className: `live-tag${item.confidence === 'low' ? ' low' : ''}`,
+      text: formatMoney(convert(item.amount, currencyOf(item, live.items, null), settings.home), settings.home),
+      x,
+      y,
+      style: `min-width:${w * 1.08 + 8}px;min-height:${h * 1.12 + 4}px;font-size:${clampNumber(h * 0.75, 13, 32)}px`,
+    });
+  }
+  const layer = $('#camera-tags');
+  const existing = new Map([...layer.children].map((el) => [el.dataset.key, el]));
+  for (const [key, el] of existing) if (!wanted.has(key)) el.remove();
+  for (const [key, view] of wanted) {
+    let el = existing.get(key);
+    if (!el) {
+      el = document.createElement('div');
+      el.dataset.key = key;
+      el.dir = 'auto';
+      layer.append(el);
+    }
+    if (el.className !== view.className) el.className = view.className;
+    if (el.textContent !== view.text) el.textContent = view.text;
+    el.style.cssText = `${view.style};left:${view.x}px;top:${view.y}px`;
+    view.el = el;
+  }
+  // Keep everything on screen: a translation too long for one line gets smaller type, and anything crossing an
+  // edge is nudged back in. (All sizes are read after all styles are set, so the page lays out once.)
+  const margin = 6;
+  const views = [...wanted.values()];
+  for (const view of views) {
+    if (!view.fit) continue;
+    const room = cw - margin * 2;
+    if (view.el.scrollWidth > room) view.el.style.fontSize = `${Math.max(10, (parseFloat(view.el.style.fontSize) * room) / view.el.scrollWidth)}px`;
+  }
+  const sizes = views.map((view) => [view.el.offsetWidth, view.el.offsetHeight]);
+  views.forEach((view, i) => {
+    const [w, h] = sizes[i];
+    view.el.style.left = `${clampNumber(view.x, w / 2 + margin, Math.max(w / 2 + margin, cw - w / 2 - margin))}px`;
+    view.el.style.top = `${clampNumber(view.y, h / 2 + margin, Math.max(h / 2 + margin, ch - h / 2 - margin))}px`;
+  });
 }
+
+function setCameraMode(mode, remember = true) {
+  live.mode = mode === 'translate' ? 'translate' : 'prices';
+  if (remember) {
+    settings.cameraMode = live.mode;
+    saveSettings();
+  }
+  if (live.mode !== 'translate') live.lineTracks = [];
+  renderCameraMode();
+  renderLive();
+  updateLiveStatus();
+}
+
+function renderCameraMode() {
+  cameraEl.dataset.mode = live.mode;
+  for (const button of $$('[data-cam-mode]')) button.setAttribute('aria-pressed', String(button.dataset.camMode === live.mode));
+}
+
+for (const button of $$('[data-cam-mode]')) button.addEventListener('click', () => setCameraMode(button.dataset.camMode));
 
 cameraEl.addEventListener('sheetclose', () => {
   // The prices the live camera saw last go to the Scan widget.
@@ -1935,7 +2250,7 @@ cameraEl.addEventListener('sheetclose', () => {
   if (seen && seen.at > (lastScan?.at || 0)) rememberScan(seen.items, (item) => currencyOf(item, seen.items, null), () => null, seen.at);
   live.lastSeen = null;
   live.session++;
-  live.items = [];
+  Object.assign(live, { items: [], priceTracks: [], shownPrices: [], lineTracks: [] });
   stopCamera(video);
 });
 
@@ -1966,7 +2281,7 @@ for (const button of $$('[data-live-camera]')) {
 }
 
 window.addEventListener('resize', () => {
-  if (!cameraEl.hidden) renderLiveTags();
+  if (!cameraEl.hidden) renderLive();
 });
 
 // Phones pause the camera in the background; restart it when the app comes back.

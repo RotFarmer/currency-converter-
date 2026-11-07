@@ -3072,6 +3072,142 @@
   :root[data-skin="aurora"] .tabbar::after { display: none; }
 }
 
+/* ===== lv_camera.css ===== */
+/* ---------- The camera and the scanning overlay in each theme ----------
+   HUD keeps its dark look over photos and video. The other themes now bring theirs: the camera's own copies of
+   the HUD colours (styles.css) give way to the theme's, and everything floating over the video gets a solid
+   backing and a shadow, so it stays readable over any picture. */
+:root[data-skin] :is(.camera, .scan-progress) {
+  color-scheme: inherit;
+  --bg: inherit; --panel: inherit; --panel-2: inherit; --line: inherit; --line-strong: inherit;
+  --accent: inherit; --accent-dim: inherit; --accent-soft: inherit; --glow: inherit; --on-accent: inherit;
+  --text: inherit; --text-dim: inherit; --text-faint: inherit; --warn: inherit; --danger: inherit;
+  --grid-line: inherit; --scanline: inherit; --topbar-fade: inherit; --statusbar: inherit;
+  --secondary-fill: inherit; --menu-open-fill: inherit; --tag-bg: inherit; --tag-text: inherit; --tag-shadow: inherit;
+  --tabbar-bg: inherit; --scrim: inherit; --toast-bg: inherit; --font-mono: inherit; --font-head: inherit;
+}
+:root[data-skin] .camera { --cam-fill: color-mix(in srgb, var(--panel) 92%, transparent); --cam-shadow: 0 3px 12px rgba(0, 0, 0, 0.45); }
+
+/* the top bar: Live badge, status and close */
+:root[data-skin] :is(.live-badge, .camera-status, .cam-btn, .cam-modes) {
+  background: var(--cam-fill);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--cam-shadow);
+  font-family: var(--font-head);
+  text-transform: var(--case);
+  letter-spacing: var(--spacing);
+}
+:root[data-skin] .live-badge { color: var(--accent); }
+:root[data-skin] .live-badge::before { border-radius: 50%; }
+:root[data-skin] .camera-status { color: var(--text); text-transform: none; letter-spacing: 0; font-size: 13px; }
+:root[data-skin] .cam-btn { color: var(--accent); border-radius: 50%; }
+:root[data-skin] .cam-btn[aria-pressed="true"] { background: var(--btn-primary-bg); color: var(--btn-primary-text); }
+:root[data-skin] .cam-hint { color: var(--text); background: var(--cam-fill); padding: 4px 9px; border-radius: 999px; text-shadow: none; box-shadow: var(--cam-shadow); font-family: var(--font-head); letter-spacing: 0.08em; }
+
+/* the viewfinder corners and the shutter */
+:root[data-skin] .camera-frame { filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6)); }
+:root[data-skin] .shutter {
+  clip-path: none;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 3px var(--accent), var(--cam-shadow);
+}
+:root[data-skin] .shutter::after { clip-path: none; border-radius: 50%; background: var(--btn-primary-bg); }
+
+/* Prices / Translate */
+:root[data-skin] .cam-modes { padding: 3px; gap: 3px; border-radius: 999px; }
+:root[data-skin] .cam-modes button { border-radius: 999px; color: var(--text-dim); font-family: var(--font-head); text-transform: var(--case); letter-spacing: var(--spacing); }
+:root[data-skin] .cam-modes button[aria-pressed="true"] { background: var(--btn-primary-bg); color: var(--btn-primary-text); }
+
+/* converted prices and translations over the video */
+:root[data-skin] .live-tag {
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--tag-bg);
+  color: var(--tag-text);
+  font-family: var(--font-num);
+  font-weight: 700;
+  text-shadow: none;
+  box-shadow: 0 2px 10px var(--tag-shadow), var(--cam-shadow);
+}
+:root[data-skin] .live-line {
+  border: 0;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  color: var(--text);
+  font-family: var(--font-mono); /* the theme's body font: easiest to read */
+  box-shadow: var(--cam-shadow);
+}
+:root[data-skin] .scan-progress-box { border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--cam-fill, var(--panel)); color: var(--text); font-family: var(--font-head); text-transform: var(--case); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
+
+/* --- each theme's own touch --- */
+/* Medieval: parchment labels, a red wax seal for a shutter */
+:root[data-skin="medieval"] .live-tag { border: 1px solid var(--line-strong); outline: 1px solid var(--line-strong); outline-offset: 2px; color: #8e1b1b; }
+:root[data-skin="medieval"][data-mode="dark"] .live-tag { color: #e0b23a; }
+:root[data-skin="medieval"] .shutter::after { background: radial-gradient(circle at 35% 30%, #d84a4a, #8e1b1b 60%, #5e0f0f); }
+:root[data-skin="medieval"] .live-badge { font-family: var(--font-title); }
+
+/* Cottage and Cloud: soft pill labels */
+:root[data-skin="cottage"] .live-tag,
+:root[data-skin="cloud"] .live-tag,
+:root[data-skin="ocean"] .live-tag,
+:root[data-skin="aurora"] .live-tag,
+:root[data-skin="aero"] .live-tag { border-radius: 999px; padding-left: 0.6em; padding-right: 0.6em; }
+:root[data-skin="cottage"] .live-tag { color: var(--accent); border-style: dashed; }
+:root[data-skin="cloud"] .live-tag { color: var(--accent); }
+
+/* Forest: leaf-shaped labels */
+:root[data-skin="forest"] .live-tag { border-radius: 3px 14px; color: var(--accent); }
+:root[data-skin="forest"] .shutter::after { background: radial-gradient(circle at 35% 30%, #ffb35c, #d9641e 65%, #8a3a0f); }
+
+/* Ocean: bubbles */
+:root[data-skin="ocean"] .shutter { background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.1) 40%, transparent 41%); }
+
+/* Aurora: glowing labels in the lights' colours */
+:root[data-skin="aurora"] .live-tag { color: var(--accent); box-shadow: 0 0 16px var(--glow), var(--cam-shadow); }
+:root[data-skin="aurora"] .shutter { box-shadow: 0 0 0 3px var(--accent), 0 0 22px var(--glow); }
+
+/* Aero: glossy */
+:root[data-skin="aero"] .live-tag { border-color: #fff; color: #0a5d8f; box-shadow: 0 2px 8px rgba(0, 80, 140, 0.45), inset 0 1px 0 #fff; }
+:root[data-skin="aero"][data-mode="dark"] .live-tag { color: #bfeaff; border-color: rgba(255, 255, 255, 0.5); }
+:root[data-skin="aero"] .shutter::after { background: radial-gradient(circle at 35% 25%, #fff 0 12%, #6fd0ff 30%, #0a7fc2 75%); }
+
+/* Iron Beetle: iron and moss */
+:root[data-skin="ironbeetle"] .live-tag { border-width: 1.5px; border-radius: 4px; color: var(--text); box-shadow: 0 0 10px var(--glow), var(--cam-shadow); }
+:root[data-skin="ironbeetle"] .shutter { border-color: #c9d6c3; box-shadow: 0 0 0 3px #2f5537, 0 0 18px var(--glow); }
+
+/* Vapor: neon, and the bust turning on the Live badge */
+:root[data-skin="vapor"] .live-tag { border: 2px solid var(--cyan); border-radius: 0; color: var(--accent); box-shadow: 3px 3px 0 rgba(255, 113, 206, 0.7), 0 0 14px rgba(1, 205, 254, 0.4); }
+:root[data-skin="vapor"] .live-line { border-radius: 0; border-left-color: var(--cyan); }
+:root[data-skin="vapor"] :is(.live-badge, .camera-status, .cam-btn, .cam-modes, .cam-modes button) { border-radius: 0; }
+:root[data-skin="vapor"] .live-badge::after { content: ""; width: 22px; height: 26px; margin: -6px -4px -6px 2px; background: url("../img/vapor-bust.gif") center / contain no-repeat; }
+:root[data-skin="vapor"] .shutter { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--accent), 0 0 20px rgba(255, 113, 206, 0.8); }
+
+/* 90s: tooltip-yellow labels, bevelled buttons, a title bar for the status */
+:root[data-skin="retro95"] .live-tag { border: 1px solid #000; border-radius: 0; background: #ffffe1; color: #000; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5); }
+:root[data-skin="retro95"] .live-line { border-radius: 0; border: 1px solid #000; background: #ffffe1; color: #000; }
+:root[data-skin="retro95"] :is(.live-badge, .cam-btn, .cam-modes, .cam-hint) { border-radius: 0; border: 0; background: #c0c0c0; color: #000; box-shadow: var(--raised); }
+:root[data-skin="retro95"] .camera-status { border-radius: 0; border: 0; background: linear-gradient(90deg, #000080, #1084d0); color: #fff; font-weight: 700; }
+:root[data-skin="retro95"] .cam-modes button { border-radius: 0; color: #000; }
+:root[data-skin="retro95"] .cam-modes button[aria-pressed="true"] { background: #000080; color: #fff; }
+:root[data-skin="retro95"] .shutter { border-radius: 0; border: 0; background: #c0c0c0; box-shadow: var(--raised); }
+:root[data-skin="retro95"] .shutter::after { border-radius: 0; inset: 12px; background: #000080; }
+
+/* 8-bit: pixel borders, square everything */
+:root[data-skin="pixel"] .live-tag { border: 0; border-radius: 0; background: #000; color: var(--accent); box-shadow: 0 -3px 0 #fcfcfc, 0 3px 0 #fcfcfc, -3px 0 0 #fcfcfc, 3px 0 0 #fcfcfc; }
+:root[data-skin="pixel"] .live-line { border-radius: 0; background: #000; color: #fcfcfc; border-left: 4px solid var(--accent); }
+:root[data-skin="pixel"] :is(.live-badge, .camera-status, .cam-btn, .cam-modes, .cam-modes button, .cam-hint) { border-radius: 0; }
+:root[data-skin="pixel"] .shutter { border-radius: 0; border: 4px solid #fcfcfc; box-shadow: 0 0 0 4px #000; }
+:root[data-skin="pixel"] .shutter::after { border-radius: 0; }
+
+/* Notebook: sticky notes */
+:root[data-skin="notebook"] .live-tag { border: 0; border-radius: 2px; background: #fff3a6; color: #2b2f36; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 1px 3px 6px rgba(0, 0, 0, 0.35); }
+:root[data-skin="notebook"] .live-line { border: 0; border-left: 3px solid #e85a4f; border-radius: 2px; background: #fffef8; color: #2b2f36; }
+:root[data-skin="notebook"] .shutter { border: 3px dashed #fff; }
+
 /* ===== lv_cloud.css ===== */
 /* ---------- Cloud: a whole sky of fluff ----------
    A rainbow and a big smiling cloud bouncing behind the panels (asleep at night), clouds drifting past at two

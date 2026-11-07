@@ -1191,6 +1191,49 @@ main { padding: 16px 16px 0; overflow-x: clip; touch-action: pan-y pinch-zoom; }
   transition: left 0.25s ease, top 0.25s ease;
 }
 .live-tag.low { border-color: var(--warn); color: var(--warn); text-shadow: none; }
+.live-tag { z-index: 2; }
+/* A line of text with its translation laid over it (live camera, Translate) */
+.live-line {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  padding: 0.1em 0.4em;
+  border-left: 2px solid var(--accent);
+  background: rgba(2, 9, 3, 0.9);
+  color: var(--text);
+  font-family: var(--font-head);
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+  transition: left 0.2s ease, top 0.2s ease;
+  animation: fade-in 0.25s ease;
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+.cam-modes {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 122px);
+  transform: translateX(-50%);
+  display: flex;
+  border: 1px solid var(--accent-dim);
+  background: rgba(2, 9, 3, 0.8);
+}
+.cam-modes button {
+  min-width: 96px;
+  padding: 8px 14px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 600 12px var(--font-head);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.cam-modes button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 
 .camera-top {
   position: absolute;
