@@ -29,7 +29,7 @@ public class ScanWidget extends AppWidgetProvider {
 
     @Override
     public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int widgetId, Bundle newOptions) {
-        manager.updateAppWidget(widgetId, build(context, manager, widgetId, WidgetData.load(context)));
+        Widgets.update(context, manager, widgetId, WidgetData.load(context), ScanWidget::build);
     }
 
     static RemoteViews build(Context context, AppWidgetManager manager, int widgetId, WidgetData data) {

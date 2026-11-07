@@ -18,25 +18,41 @@ public class WidgetBridgePlugin extends Plugin {
     /** Your currencies, quick reference amounts, last scan, rates or theme changed: save and redraw the widgets. */
     @PluginMethod
     public void update(PluginCall call) {
-        JSObject data = call.getData();
-        JSONObject art = data.optJSONObject("art");
-        if (art != null) {
-            // A new theme look: save its images, keep only its description with the data.
-            data.remove("art");
-            try {
-                data.put("artMeta", WidgetArt.save(getContext(), art));
-            } catch (Exception e) {
-                // The widgets fall back to their plain look.
+        // Anything thrown here would close the app (Capacitor rethrows), and the app sends this every time it opens.
+        try {
+            JSObject data = call.getData();
+            JSONObject art = data.optJSONObject("art");
+            if (art != null) {
+                // A new theme look: save its images, keep only its description with the data.
+                data.remove("art");
+                try {
+                    data.put("artMeta", WidgetArt.save(getContext(), art));
+                } catch (Throwable t) {
+                    CrashLog.caught(getContext(), "widget art", t);
+                }
+            } else {
+                // Same look as before: carry its description over.
+                WidgetData previous = WidgetData.load(getContext());
+                JSONObject meta = WidgetArt.meta(previous);
+                if (meta != null && meta.optString("id").equals(data.optString("artId", ""))) data.put("artMeta", meta);
             }
-        } else {
-            // Same look as before: carry its description over.
-            WidgetData previous = WidgetData.load(getContext());
-            JSONObject meta = WidgetArt.meta(previous);
-            if (meta != null && meta.optString("id").equals(data.optString("artId", ""))) data.put("artMeta", meta);
+            WidgetData.save(getContext(), data.toString());
+        } catch (Throwable t) {
+            CrashLog.caught(getContext(), "widget data", t);
         }
-        WidgetData.save(getContext(), data.toString());
         Widgets.renderAll(getContext());
         call.resolve();
+    }
+
+    /** The last crash (once) and the last error the app caught and carried on from, for Settings → App. */
+    @PluginMethod
+    public void diagnostics(PluginCall call) {
+        JSObject result = new JSObject();
+        String crash = CrashLog.take(getContext(), CrashLog.CRASH, true);
+        String caught = CrashLog.take(getContext(), CrashLog.CAUGHT, call.getBoolean("clear", false));
+        if (crash != null) result.put("crash", crash);
+        if (caught != null) result.put("caught", caught);
+        call.resolve(result);
     }
 
     /** What the app was opened for (for example "camera" from the Scan widget), once. */
@@ -52,26 +68,44 @@ public class WidgetBridgePlugin extends Plugin {
     @PluginMethod
     public void checkUpdate(PluginCall call) {
         new Thread(() -> {
-            JSObject result = new JSObject();
-            result.put("installed", Updater.installedVersion(getContext()));
-            result.put("installedName", Updater.installedVersionName(getContext()));
-            result.put("quiet", Updater.canUpdateQuietly(getContext()));
-            if (Updater.lastStatus != null) result.put("status", Updater.lastStatus);
             try {
-                Updater.Release release = Updater.latest(getContext());
-                result.put("latest", release.versionCode);
-                result.put("latestName", release.versionName);
-                result.put("sameKey", release.sameKey);
-            } catch (Exception e) {
-                result.put("error", "Couldn't check for updates");
+                call.resolve(updateStatus());
+            } catch (Throwable t) {
+                CrashLog.caught(getContext(), "update check", t);
+                call.reject("Couldn't check for updates");
             }
-            call.resolve(result);
         }).start();
+    }
+
+    private JSObject updateStatus() {
+        JSObject result = new JSObject();
+        result.put("installed", Updater.installedVersion(getContext()));
+        result.put("installedName", Updater.installedVersionName(getContext()));
+        result.put("quiet", Updater.canUpdateQuietly(getContext()));
+        if (Updater.lastStatus != null) result.put("status", Updater.lastStatus);
+        try {
+            Updater.Release release = Updater.latest(getContext());
+            result.put("latest", release.versionCode);
+            result.put("latestName", release.versionName);
+            result.put("sameKey", release.sameKey);
+        } catch (Exception e) {
+            result.put("error", "Couldn't check for updates");
+        }
+        return result;
     }
 
     /** You tapped Install: download the newest build and hand it to Android's installer. */
     @PluginMethod
     public void installUpdate(PluginCall call) {
+        try {
+            startInstall(call);
+        } catch (Throwable t) {
+            CrashLog.caught(getContext(), "install update", t);
+            call.reject("Couldn't install the update.");
+        }
+    }
+
+    private void startInstall(PluginCall call) {
         if (!Updater.mayInstall(getContext())) {
             // First Android asks you to allow Converter to install updates.
             Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
@@ -94,7 +128,7 @@ public class WidgetBridgePlugin extends Plugin {
                 JSObject result = new JSObject();
                 result.put("started", true);
                 call.resolve(result);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 Updater.lastStatus = "failed: " + e.getMessage();
                 call.reject("Couldn't download the update. Check your connection.");
             }

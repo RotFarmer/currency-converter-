@@ -79,6 +79,9 @@ final class WidgetArt {
         String id = meta.optString("id") + ":" + mode;
         // At most twice the dp size: sharp enough, and small enough to hand to the home screen.
         float scale = Math.min(context.getResources().getDisplayMetrics().density, 2f);
+        // Each background stays under about 1.6 MB (two per widget from Android 12): the home screen limits how
+        // much image a widget may send.
+        while (scale > 1f && widthDp * scale * heightDp * scale > 400_000) scale -= 0.25f;
         int w = Math.max(1, Math.round(widthDp * scale));
         int h = Math.max(1, Math.round(heightDp * scale));
         String key = id + ":" + w + "x" + h;

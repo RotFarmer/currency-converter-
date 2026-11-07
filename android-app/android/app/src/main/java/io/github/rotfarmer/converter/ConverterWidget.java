@@ -37,7 +37,7 @@ public class ConverterWidget extends AppWidgetProvider {
     @Override
     public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int widgetId, Bundle newOptions) {
         // Resized: the background is drawn again at the new size.
-        manager.updateAppWidget(widgetId, build(context, manager, widgetId, WidgetData.load(context)));
+        Widgets.update(context, manager, widgetId, WidgetData.load(context), ConverterWidget::build);
     }
 
     @Override
@@ -94,6 +94,14 @@ public class ConverterWidget extends AppWidgetProvider {
 
     /** A key was tapped on a converter widget: only the display is redrawn, so typing stays quick. */
     static void onKey(Context context, int widgetId, String key) {
+        try {
+            press(context, widgetId, key);
+        } catch (Throwable t) {
+            CrashLog.caught(context, "converter key", t);
+        }
+    }
+
+    private static void press(Context context, int widgetId, String key) {
         WidgetData data = WidgetData.load(context);
         WidgetData.Place place = data == null || !data.hasRates() ? null : data.place();
         SharedPreferences prefs = WidgetData.prefs(context);

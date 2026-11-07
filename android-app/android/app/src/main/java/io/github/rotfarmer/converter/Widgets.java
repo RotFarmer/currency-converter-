@@ -39,16 +39,61 @@ final class Widgets {
 
     /** Redraws every Converter, Quick reference and Scan widget on the home screen. */
     static void renderAll(Context context) {
-        AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        WidgetData data = WidgetData.load(context);
-        for (int id : manager.getAppWidgetIds(new ComponentName(context, ReferenceWidget.class))) {
-            manager.updateAppWidget(id, ReferenceWidget.build(context, manager, id, data));
+        AppWidgetManager manager;
+        WidgetData data;
+        try {
+            manager = AppWidgetManager.getInstance(context);
+            data = WidgetData.load(context);
+        } catch (Throwable t) {
+            CrashLog.caught(context, "widgets", t);
+            return;
         }
-        for (int id : manager.getAppWidgetIds(new ComponentName(context, ConverterWidget.class))) {
-            manager.updateAppWidget(id, ConverterWidget.build(context, manager, id, data));
+        renderEach(context, manager, data, ReferenceWidget.class, ReferenceWidget::build);
+        renderEach(context, manager, data, ConverterWidget.class, ConverterWidget::build);
+        renderEach(context, manager, data, ScanWidget.class, ScanWidget::build);
+    }
+
+    /** Builds one widget's views. */
+    interface Builder {
+        RemoteViews build(Context context, AppWidgetManager manager, int widgetId, WidgetData data);
+    }
+
+    private static void renderEach(Context context, AppWidgetManager manager, WidgetData data, Class<?> provider, Builder builder) {
+        int[] ids;
+        try {
+            ids = manager.getAppWidgetIds(new ComponentName(context, provider));
+        } catch (Throwable t) {
+            CrashLog.caught(context, "widgets", t);
+            return;
         }
-        for (int id : manager.getAppWidgetIds(new ComponentName(context, ScanWidget.class))) {
-            manager.updateAppWidget(id, ScanWidget.build(context, manager, id, data));
+        for (int id : ids) update(context, manager, id, data, builder);
+    }
+
+    /** While true (on this thread), widgets are drawn plain: no theme art, and one colour for both modes. */
+    private static final ThreadLocal<Boolean> PLAIN = new ThreadLocal<>();
+
+    static boolean plain() {
+        return Boolean.TRUE.equals(PLAIN.get());
+    }
+
+    /**
+     * Draws one widget. Nothing here may close the app: if drawing it with the theme's art fails (for example the
+     * home screen refuses the image), it's drawn plain instead, and the error is kept for Settings → App.
+     */
+    static void update(Context context, AppWidgetManager manager, int widgetId, WidgetData data, Builder builder) {
+        try {
+            manager.updateAppWidget(widgetId, builder.build(context, manager, widgetId, data));
+            return;
+        } catch (Throwable t) {
+            CrashLog.caught(context, "widget " + widgetId, t);
+        }
+        PLAIN.set(true);
+        try {
+            manager.updateAppWidget(widgetId, builder.build(context, manager, widgetId, data));
+        } catch (Throwable t) {
+            CrashLog.caught(context, "widget " + widgetId + " (plain)", t);
+        } finally {
+            PLAIN.set(false);
         }
     }
 
@@ -59,20 +104,10 @@ final class Widgets {
     static void paintFrame(Context context, RemoteViews views, WidgetData data, AppWidgetManager manager, int widgetId, int defaultWidthDp, int defaultHeightDp) {
         int[] size = sizeDp(manager, widgetId, defaultWidthDp, defaultHeightDp);
         boolean hasArt = false;
-        if (Build.VERSION.SDK_INT >= 31) {
-            // Both looks: the home screen shows the one that suits the phone's dark mode, and switches by itself.
-            Bitmap light = WidgetArt.frame(context, data, size[0], size[1], false);
-            Bitmap dark = light == null ? null : WidgetArt.frame(context, data, size[0], size[1], true);
-            if (dark != null) {
-                views.setIcon(R.id.widget_bg, "setImageIcon", Icon.createWithBitmap(light), Icon.createWithBitmap(dark));
-                hasArt = true;
-            }
-        } else {
-            Bitmap art = WidgetArt.frame(context, data, size[0], size[1], isNight(context));
-            if (art != null) {
-                views.setImageViewBitmap(R.id.widget_bg, art);
-                hasArt = true;
-            }
+        try {
+            hasArt = !plain() && paintArt(context, views, data, size);
+        } catch (Throwable t) {
+            CrashLog.caught(context, "widget art", t);
         }
         if (hasArt) {
             views.setInt(R.id.widget_bg, "setColorFilter", 0);
@@ -90,6 +125,22 @@ final class Widgets {
         paint(context, views, R.id.updated, "setTextColor", data, "dim");
     }
 
+    /** The theme's art as the widget's background; false when the theme has none. */
+    private static boolean paintArt(Context context, RemoteViews views, WidgetData data, int[] size) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Both looks: the home screen shows the one that suits the phone's dark mode, and switches by itself.
+            Bitmap light = WidgetArt.frame(context, data, size[0], size[1], false);
+            Bitmap dark = light == null ? null : WidgetArt.frame(context, data, size[0], size[1], true);
+            if (dark == null) return false;
+            views.setIcon(R.id.widget_bg, "setImageIcon", Icon.createWithBitmap(light), Icon.createWithBitmap(dark));
+            return true;
+        }
+        Bitmap art = WidgetArt.frame(context, data, size[0], size[1], isNight(context));
+        if (art == null) return false;
+        views.setImageViewBitmap(R.id.widget_bg, art);
+        return true;
+    }
+
     /**
      * Gives a view one of the theme's colours (bg, text, dim, accent, line) through a method taking a colour, such
      * as setTextColor or setColorFilter. From Android 12 it gets both the light and the dark version and the home
@@ -99,7 +150,7 @@ final class Widgets {
         int fallback = fallbackColor(key);
         if (data == null) {
             views.setInt(viewId, method, fallback);
-        } else if (Build.VERSION.SDK_INT >= 31) {
+        } else if (Build.VERSION.SDK_INT >= 31 && !plain()) {
             views.setColorInt(viewId, method, data.color(key, fallback, false), data.color(key, fallback, true));
         } else {
             views.setInt(viewId, method, data.color(key, fallback, isNight(context)));

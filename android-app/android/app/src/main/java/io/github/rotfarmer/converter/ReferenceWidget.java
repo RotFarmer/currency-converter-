@@ -32,7 +32,7 @@ public class ReferenceWidget extends AppWidgetProvider {
     @Override
     public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int widgetId, Bundle newOptions) {
         // Resized: show as many rows as fit.
-        manager.updateAppWidget(widgetId, build(context, manager, widgetId, WidgetData.load(context)));
+        Widgets.update(context, manager, widgetId, WidgetData.load(context), ReferenceWidget::build);
     }
 
     static RemoteViews build(Context context, AppWidgetManager manager, int widgetId, WidgetData data) {

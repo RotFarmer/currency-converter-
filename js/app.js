@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v29'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v30'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -206,11 +206,9 @@ function themeProbe() {
     frame.hidden = true;
     frame.tabIndex = -1;
     frame.setAttribute('aria-hidden', 'true');
-    const links = $$('link[rel="stylesheet"]')
-      .filter((link) => link.href.startsWith(location.origin))
-      .map((link) => `<link rel="stylesheet" href="${link.href}">`)
-      .join('');
-    frame.srcdoc = `<!doctype html><html><head>${links}</head><body></body></html>`;
+    // A real page on this site (not srcdoc or about:blank): the Android app opens anything that isn't on the
+    // app's own site in another app.
+    frame.src = new URL('theme-probe.html', document.baseURI).href;
     const timer = setTimeout(() => resolve(null), 4000);
     frame.addEventListener('load', () => {
       clearTimeout(timer);
@@ -257,7 +255,20 @@ async function widgetColorsFor(mode) {
   return widgetColorsFrom(frame.contentWindow.getComputedStyle(root));
 }
 
+/*
+ * App builds up to 8 close if drawing a widget fails, and the app sends widget data every time it opens, so they
+ * get none: reinstalling (build 9 or later) brings the widgets back. The build number comes from the update check.
+ */
+const FIRST_SAFE_WIDGET_BUILD = 9;
+let nativeBuildPromise = null;
+
+function nativeBuild() {
+  nativeBuildPromise ||= window.Capacitor.nativePromise('Widgets', 'checkUpdate', {}).then((u) => (u && u.installed) || 0, () => 0);
+  return nativeBuildPromise;
+}
+
 async function sendWidgetData() {
+  if ((await nativeBuild()) < FIRST_SAFE_WIDGET_BUILD) return;
   const rates = getRates();
   const { home } = settings;
   const money = {};
@@ -2264,6 +2275,7 @@ async function checkAppUpdate({ manual = false } = {}) {
   if (manual) renderAppUpdate('checking');
   try {
     appUpdate = await window.Capacitor.nativePromise('Widgets', 'checkUpdate', {});
+    nativeBuildPromise ||= Promise.resolve(appUpdate?.installed || 0);
   } catch {
     appUpdate = null; // an older app without the updater
   }
@@ -2323,9 +2335,43 @@ $('#update-btn').addEventListener('click', () => {
   else checkAppUpdate({ manual: true });
 });
 $('#update-card-install').addEventListener('click', installAppUpdate);
+
+/* The last crash, or an error the widgets recovered from (app build 9 and later), with the details to copy. */
+let problems = null; // { crash, caught }
+
+async function loadProblems() {
+  try {
+    problems = await window.Capacitor.nativePromise('Widgets', 'diagnostics', {});
+  } catch {
+    problems = null; // an older app
+  }
+  const report = problems?.crash || problems?.caught;
+  $('#problem-row').hidden = !report;
+  if (!report) return;
+  $('#problem-title').textContent = problems.crash ? 'The app closed unexpectedly' : 'A widget ran into a problem';
+  const [first, second = ''] = report.split('\n');
+  $('#problem-hint').textContent = `${second.trim() || first} · Tap to copy the details`;
+}
+
+$('#problem-row').addEventListener('click', async () => {
+  const text = [problems?.crash, problems?.caught].filter(Boolean).join('\n\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Details copied');
+  } catch {
+    toast('Couldn’t copy the details');
+    return;
+  }
+  // Copied: the widget error is cleared (a crash is only ever shown once).
+  window.Capacitor.nativePromise('Widgets', 'diagnostics', { clear: true }).catch(() => {});
+  problems = null;
+  $('#problem-row').hidden = true;
+});
+
 // Check when the app opens, and again when you come back to it.
 if (isNativeApp) {
   setTimeout(checkAppUpdate, 2500);
+  setTimeout(loadProblems, 3000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') checkAppUpdate();
   });
