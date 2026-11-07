@@ -1,7 +1,9 @@
 package io.github.rotfarmer.converter;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
+import android.os.SystemClock;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -20,6 +22,10 @@ final class CrashLog {
 
     static final String CRASH = "last-crash.txt";
     static final String CAUGHT = "last-caught-error.txt";
+    /** A crash this soon after the app started counts as "straight after opening". */
+    private static final long QUICK_MS = 30_000;
+    private static final String PREFS = "converter_crashes";
+    private static final String QUICK = "quick_crashes";
 
     private CrashLog() {}
 
@@ -32,7 +38,36 @@ final class CrashLog {
 
     /** An error that was caught (the app carried on): remembered so it can be looked at. */
     static void caught(Context context, String where, Throwable error) {
-        write(context, CAUGHT, describe(context, where, error));
+        record(context, where, error);
+    }
+
+    /** Like caught, and returns the report. */
+    static String record(Context context, String where, Throwable error) {
+        String text = describe(context, where, error);
+        write(context, CAUGHT, text);
+        return text;
+    }
+
+    /** How many times in a row the app crashed straight after opening. */
+    static int quickCrashes(Context context) {
+        try {
+            return prefs(context).getInt(QUICK, 0);
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    /** The app has been open a while without crashing: it works again. */
+    static void resetQuickCrashes(Context context) {
+        try {
+            prefs(context).edit().putInt(QUICK, 0).apply();
+        } catch (Throwable ignored) {
+            // nothing to reset
+        }
+    }
+
+    private static SharedPreferences prefs(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     /** The saved report, or null; a crash report is removed once read, so it's shown once. */
@@ -61,8 +96,9 @@ final class CrashLog {
             // the report matters more than the build number
         }
         String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
-        return time + " · " + where + " · build " + build + " · Android " + Build.VERSION.RELEASE + " (" + Build.VERSION.SDK_INT + ") · "
-            + Build.MANUFACTURER + " " + Build.MODEL + "\n" + trace;
+        long seconds = (SystemClock.elapsedRealtime() - ConverterApp.startedAt) / 1000;
+        return time + " · " + where + " · " + seconds + "s after opening · build " + build + " · Android " + Build.VERSION.RELEASE
+            + " (" + Build.VERSION.SDK_INT + ") · " + Build.MANUFACTURER + " " + Build.MODEL + "\n" + trace;
     }
 
     private static void write(Context context, String name, String text) {
@@ -86,6 +122,14 @@ final class CrashLog {
         @Override
         public void uncaughtException(Thread thread, Throwable error) {
             write(context, CRASH, describe(context, "crash in " + thread.getName(), error));
+            try {
+                // Straight after opening? Then the next start is careful (safe mode, then just the report).
+                boolean quick = SystemClock.elapsedRealtime() - ConverterApp.startedAt < QUICK_MS;
+                SharedPreferences prefs = prefs(context);
+                prefs.edit().putInt(QUICK, quick ? prefs.getInt(QUICK, 0) + 1 : 0).commit();
+            } catch (Throwable ignored) {
+                // the report is what matters
+            }
             if (previous != null) previous.uncaughtException(thread, error);
         }
     }

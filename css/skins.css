@@ -5707,3 +5707,33 @@
   :root[data-skin="vapor"] .sys-code,
   .skin-card[data-skin-option="vapor"] .skin-preview::after { background-image: url("../img/vapor-bust-still.png"); }
 }
+
+/* ===== lv_zz_safe.css ===== */
+/* ---------- Safe mode ----------
+   The Android app opens the page with ?safe=1 after it crashed: no moving or fixed theme art at all, so a theme's
+   effects can't take the page down again. (The head script sets data-safe.) */
+:root[data-safe]::before,
+:root[data-safe]::after,
+:root[data-safe] body::before,
+:root[data-safe] body::after,
+:root[data-safe] .app::before,
+:root[data-safe] .app::after,
+:root[data-safe] main::before,
+:root[data-safe] main::after,
+:root[data-safe] .view::before,
+:root[data-safe] .topbar::before,
+:root[data-safe] .topbar::after,
+:root[data-safe] .tabbar::before,
+:root[data-safe] .tabbar::after,
+:root[data-safe][data-skin] .panel::before,
+:root[data-safe][data-skin] .panel::after {
+  display: none !important;
+}
+:root[data-safe] *,
+:root[data-safe] *::before,
+:root[data-safe] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root[data-safe] .sys-code { background-image: none !important; color: inherit !important; font-size: 12px !important; width: auto !important; height: auto !important; margin: 0 !important; padding: 1px 6px !important; }
+:root[data-safe] .app { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 18px) !important; }

@@ -23,7 +23,7 @@ import { currencyForLanguage, languageName, isRtl, SCAN_LANGUAGES, TARGET_LANGUA
 import { translateLines, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v30'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v31'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -267,8 +267,11 @@ function nativeBuild() {
   return nativeBuildPromise;
 }
 
+/** Opened in safe mode by the Android app after a crash (see the head script): the theme's moving art is off. */
+const safeMode = 'safe' in document.documentElement.dataset;
+
 async function sendWidgetData() {
-  if ((await nativeBuild()) < FIRST_SAFE_WIDGET_BUILD) return;
+  if (safeMode || (await nativeBuild()) < FIRST_SAFE_WIDGET_BUILD) return;
   const rates = getRates();
   const { home } = settings;
   const money = {};
@@ -2372,6 +2375,7 @@ $('#problem-row').addEventListener('click', async () => {
 if (isNativeApp) {
   setTimeout(checkAppUpdate, 2500);
   setTimeout(loadProblems, 3000);
+  if (safeMode) setTimeout(() => toast('Safe mode: the theme’s moving art is off until you reopen the app'), 1200);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') checkAppUpdate();
   });

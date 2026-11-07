@@ -8,6 +8,8 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#040605">
   <script>
+    // Safe mode: the Android app opens the page with ?safe=1 after a crash; the theme's moving art stays off.
+    if (/[?&]safe=1(&|$)/.test(location.search)) document.documentElement.dataset.safe = '';
     // Apply the saved look (theme, light/dark, accent colour, effects, font) before the page draws,
     // so it doesn't flash the default theme first.
     try {
