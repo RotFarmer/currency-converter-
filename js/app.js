@@ -16,15 +16,15 @@ import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, parseAmountEntry, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
 import { photoToCanvas, preloadOcr, readText, lastEngine } from './ocr.js';
-import { nativeVision, nativeIdentify, scriptForCurrencies } from './native-vision.js';
+import { nativeVision, nativeIdentify, nativeTranslate, scriptForCurrencies } from './native-vision.js';
 import { cameraSupported, startCamera, stopCamera, torchSupported, setTorch, grabFrame } from './camera.js';
 import { readPrices, identifyLanguage, readInLanguage, mergePrices } from './scan.js';
 import { textLines, labelFor } from './layout.js';
-import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, languageForCurrencies, isLatinLanguage, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
+import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, languageForCurrencies, languageForCurrency, isLatinLanguage, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
 import { translateLines, translateLive, translationMethod, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v35'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v36'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -60,6 +60,7 @@ const settings = {
   fx: { scanlines: true, grid: true, glow: true },
   cameraMode: 'prices', // the live camera shows converted "prices" or "translate"s the text
   iconFollowsTheme: true, // Android app: the launcher icon matches the theme
+  recentLanguages: [], // languages scanned or translated lately, newest first (their translators are kept ready)
   ...load('settings', {}),
 };
 if (settings.skin === 'frostmire') settings.skin = 'ironbeetle'; // renamed theme
@@ -1590,6 +1591,7 @@ async function analyseLanguage(run, forcedLang = null) {
 async function translateScan(live = () => true) {
   const from = scan.language;
   const to = settings.translateTo;
+  if (settings.translate) rememberLanguage(from);
   scan.translations = null;
   if (!settings.translate) scan.translateStatus = 'off';
   else if (!from || !scan.groups.length) scan.translateStatus = 'idle';
@@ -2145,6 +2147,7 @@ function setLiveLanguage(lang) {
   // A different language has to come up twice in a row before it takes over.
   if (!live.lang || live.langCandidate === lang) {
     live.lang = lang;
+    if (live.mode === 'translate') rememberLanguage(lang);
     live.langCandidate = null;
     live.translateState = '';
     live.retryAt = 0;
@@ -2419,6 +2422,64 @@ $('#lang-status').addEventListener('click', () => {
   if (scan.translateStatus === 'failed' && scan.language) translateScan(liveCheck());
 });
 
+/* ---------- Translators ready ahead of time (Android app) ---------- */
+// The phone translates a language once it has downloaded it (about 30 MB, once). The app gets the likely ones as soon
+// as it opens, so the camera can translate straight away instead of waiting for a download.
+const offlineLanguages = new Map(); // "fr>en" → 'ready' | 'downloading'
+let prepareTimer = 0;
+let lastLikelyLanguages = '';
+
+/** The languages you're likely to read: where you are, your other currencies' and the ones you've translated lately. */
+function likelyLanguages() {
+  const region = settings.autoSource ? settings.sourceRegion : null;
+  const fromCurrencies = [languageForCurrency(settings.source, region), ...settings.extra.slice(0, 3).map((code) => languageForCurrency(code))];
+  const to = baseLanguage(settings.translateTo);
+  return [...new Set([...fromCurrencies, ...settings.recentLanguages])].filter((lang) => lang && baseLanguage(lang) !== to).slice(0, 6);
+}
+
+function rememberLanguage(lang) {
+  if (!lang || settings.recentLanguages[0] === lang) return;
+  settings.recentLanguages = [lang, ...settings.recentLanguages.filter((other) => other !== lang)].slice(0, 4);
+  saveSettings();
+  renderOfflineLanguages();
+  prepareTranslators({ delay: 1000 });
+}
+
+/** Start downloading the likely languages the phone doesn't have yet, then check back until they're ready. */
+function prepareTranslators({ delay = 0 } = {}) {
+  if (!isNativeApp || safeMode) return;
+  clearTimeout(prepareTimer);
+  prepareTimer = setTimeout(async () => {
+    if (!settings.translate || !(await nativeVision())?.translate) return;
+    const to = settings.translateTo;
+    let downloading = false;
+    for (const lang of likelyLanguages()) {
+      const key = `${lang}>${to}`;
+      if (offlineLanguages.get(key) === 'ready') continue;
+      // Asking for a translation starts the download when the language isn't on the phone yet.
+      const result = await nativeTranslate(['menu'], lang, to);
+      if (result?.status === 'done') offlineLanguages.set(key, 'ready');
+      else if (result?.status === 'downloading') offlineLanguages.set(key, 'downloading');
+      else offlineLanguages.delete(key);
+      downloading ||= result?.status === 'downloading';
+    }
+    renderOfflineLanguages();
+    if (downloading) prepareTranslators({ delay: 15000 });
+  }, delay);
+}
+
+/** Settings → Translate to: which languages are ready to translate offline, and which are downloading. */
+function renderOfflineLanguages() {
+  const hint = $('#offline-languages');
+  const to = settings.translateTo;
+  const named = (state) => likelyLanguages().filter((lang) => offlineLanguages.get(`${lang}>${to}`) === state).map(languageName);
+  const parts = [];
+  if (settings.translate && named('ready').length) parts.push(`Ready offline: ${named('ready').join(', ')}`);
+  if (settings.translate && named('downloading').length) parts.push(`Downloading: ${named('downloading').join(', ')}`);
+  hint.hidden = !parts.length;
+  hint.textContent = parts.join(' · ');
+}
+
 // A check that goes stale as soon as a new photo or language choice comes in.
 function liveCheck() {
   const { run, langRun } = scan;
@@ -2558,6 +2619,12 @@ function renderAll() {
   $('#welcome').hidden = settings.homeChosen;
   $('#auto-source-toggle').checked = settings.autoSource;
   $('#icon-toggle').checked = settings.iconFollowsTheme;
+  renderOfflineLanguages();
+  const likely = `${settings.translate}|${settings.translateTo}|${likelyLanguages().join()}`;
+  if (likely !== lastLikelyLanguages) {
+    lastLikelyLanguages = likely;
+    prepareTranslators({ delay: 2500 });
+  }
   $('#source-badge').hidden = !(settings.autoSource && settings.sourceRegion);
   $('#source-hint').textContent = !settings.autoSource
     ? 'Set by you'
