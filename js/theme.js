@@ -28,6 +28,7 @@ export const SKINS = [
   { id: 'vapor', name: 'Vapor', mode: 'dark' },
   { id: 'pixel', name: '8-bit', mode: 'dark' },
   { id: 'notebook', name: 'Notebook' },
+  { id: 'pet', name: 'Pocket Pet' },
 ];
 
 // Themes that were renamed.
