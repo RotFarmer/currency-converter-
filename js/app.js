@@ -24,7 +24,7 @@ import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, language
 import { translateLines, translateLive, translationMethod, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v34'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v35'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -1599,7 +1599,15 @@ async function translateScan(live = () => true) {
   if (scan.translateStatus !== 'busy') return;
   try {
     const texts = scan.groups.map((group) => group.text);
-    const translated = await translateLines(texts, from, to);
+    const translated = await translateLines(texts, from, to, {
+      // The online translator couldn't be reached: the phone finishes downloading the language and translates it.
+      onWait: () => {
+        if (!live()) return;
+        scan.translateStatus = 'waiting';
+        renderScan();
+      },
+      isCancelled: () => !live(),
+    });
     if (!live()) return;
     scan.translations = new Map(texts.map((text, i) => [text, translated[i]]));
     scan.translateStatus = 'done';
@@ -1609,7 +1617,7 @@ async function translateScan(live = () => true) {
     scan.translateStatus = 'failed';
     const message = String(error?.message || '');
     if (!navigator.onLine) scan.translateError = 'you’re offline';
-    else if (/fetch|network|abort|timeout/i.test(message)) scan.translateError = 'couldn’t reach the translator';
+    else if (/fetch|network|abort|timeout|load failed/i.test(message)) scan.translateError = 'couldn’t reach the online translator';
     else scan.translateError = message || 'unknown error';
   }
   renderScan();
@@ -1666,12 +1674,16 @@ function renderLanguageBar() {
   else if (scan.langStatus === 'failed') [text, state] = ['Couldn’t identify the language. Tap LANG to choose.', 'error'];
   else if (scan.langStatus === 'none') text = 'Language not recognised. Tap LANG to choose.';
   else if (scan.translateStatus === 'busy') [text, state] = [`Translating to ${languageName(settings.translateTo)}…`, 'busy'];
+  else if (scan.translateStatus === 'waiting') [text, state] = [`Downloading ${languageName(scan.language)} to translate on your phone…`, 'busy'];
   else if (scan.translateStatus === 'done') text = `Translated to ${languageName(settings.translateTo)}${translationNote()}`;
   else if (scan.translateStatus === 'same') text = `Already in ${languageName(settings.translateTo)}`;
   else if (scan.translateStatus === 'off') text = 'Translation is off (Settings)';
-  else if (scan.translateStatus === 'failed') [text, state] = [`Translation failed: ${scan.translateError}`, 'error'];
+  else if (scan.translateStatus === 'failed') [text, state] = [`Translation failed: ${scan.translateError}. Tap to try again.`, 'error'];
   status.textContent = text;
   status.className = `lang-status${state ? ` ${state}` : ''}`;
+  status.classList.toggle('retry', scan.translateStatus === 'failed');
+  if (scan.translateStatus === 'failed') status.setAttribute('role', 'button');
+  else status.removeAttribute('role');
   const offerGoogle = ['failed', 'off'].includes(scan.translateStatus) && scan.language && scan.groups.length;
   $('#lang-google').hidden = !offerGoogle;
   if (offerGoogle) $('#lang-google').href = googleLink();
@@ -2401,6 +2413,11 @@ for (const [selector, key] of Object.entries(toggles)) {
     renderAll();
   });
 }
+
+// Translation failed: tap the message to try again.
+$('#lang-status').addEventListener('click', () => {
+  if (scan.translateStatus === 'failed' && scan.language) translateScan(liveCheck());
+});
 
 // A check that goes stale as soon as a new photo or language choice comes in.
 function liveCheck() {

@@ -8,6 +8,7 @@ import { nativeTranslate } from './native-vision.js';
 const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
 const MAX_BYTES = 450; // MyMemory accepts up to 500 bytes per request
 const TIMEOUT_MS = 12000;
+const DOWNLOAD_WAIT_MS = 180000; // how long a scan waits for the phone to download a language
 const cache = new Map();
 /** How the last translation was done: 'device', 'browser', 'online', or 'downloading' (online while the phone
  * downloads the language). */
@@ -23,15 +24,18 @@ function serviceCode(lang) {
   return lang;
 }
 
-/** Translate each line from one language to another. Returns translations in the same order. */
-export async function translateLines(lines, from, to) {
+/**
+ * Translate each line from one language to another. Returns translations in the same order.
+ * onWait: called when it waits for the phone to download the language; isCancelled: stop waiting.
+ */
+export async function translateLines(lines, from, to, { onWait, isCancelled } = {}) {
   if (!lines.length) return [];
   if (baseLanguage(from) === baseLanguage(to) && from !== 'zh-TW') return lines.slice();
   const key = (line) => `${from}|${to}|${line}`;
   const missing = [...new Set(lines.filter((line) => !cache.has(key(line))))];
   const fresh = new Map();
   if (missing.length) {
-    const translate = await pickTranslator(from, to);
+    const translate = await pickTranslator(from, to, { onWait, isCancelled });
     const results = await translate(missing);
     // Online stand-ins while the phone downloads the language aren't kept: next time the phone translates.
     const keep = lastMethod !== 'downloading';
@@ -48,7 +52,7 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
 }
 
-async function pickTranslator(from, to) {
+async function pickTranslator(from, to, { onWait, isCancelled } = {}) {
   const fallback = await webTranslator(from, to);
   return async (texts) => {
     const device = await nativeTranslate(texts, from, to);
@@ -56,10 +60,33 @@ async function pickTranslator(from, to) {
       lastMethod = 'device';
       return device.translations;
     }
-    const results = await fallback(texts);
-    if (device?.status === 'downloading') lastMethod = 'downloading';
-    return results;
+    try {
+      const results = await fallback(texts);
+      if (device?.status === 'downloading') lastMethod = 'downloading';
+      return results;
+    } catch (error) {
+      // The online translator failed, but the phone is getting the language: wait for it instead.
+      if (device?.status !== 'downloading') throw error;
+      onWait?.();
+      return waitForDevice(texts, from, to, isCancelled);
+    }
   };
+}
+
+/** Translate on the phone once it has downloaded the language (checks every couple of seconds). */
+async function waitForDevice(texts, from, to, isCancelled = () => false) {
+  const until = Date.now() + DOWNLOAD_WAIT_MS;
+  while (Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    if (isCancelled()) throw new Error('cancelled');
+    const device = await nativeTranslate(texts, from, to);
+    if (device?.status === 'done' && device.translations?.length === texts.length) {
+      lastMethod = 'device';
+      return device.translations;
+    }
+    if (device?.status !== 'downloading') break;
+  }
+  throw new Error('the language download didn’t finish. Check your connection');
 }
 
 /** The browser's on-device translator for these languages, if it has one ready; null otherwise. */
@@ -160,7 +187,20 @@ async function translateOnline(texts, from, to) {
   return translated.flat();
 }
 
+/** One online request, tried again once if it couldn't get through (a flaky mobile connection). */
 async function requestTranslation(text, from, to) {
+  try {
+    return await requestOnce(text, from, to);
+  } catch (error) {
+    if (!isNetworkError(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    return requestOnce(text, from, to);
+  }
+}
+
+const isNetworkError = (error) => error?.name === 'AbortError' || error instanceof TypeError;
+
+async function requestOnce(text, from, to) {
   const url = `${MYMEMORY_URL}?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(`${serviceCode(from)}|${serviceCode(to)}`)}&mt=1`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);

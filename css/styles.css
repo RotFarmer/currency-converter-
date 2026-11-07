@@ -736,6 +736,7 @@ main { padding: 16px 16px 0; overflow-x: clip; touch-action: pan-y pinch-zoom; }
 .readout .k { font: 600 10px var(--font-head); letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-faint); }
 .readout .v { font-size: 15px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
 .lang-status { grid-column: 1; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.lang-status.retry { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .lang-status:empty { display: none; }
 .lang-status.busy::before { content: "▮ "; color: var(--accent); animation: blink 0.8s steps(2) infinite; }
 .lang-status.error { color: var(--warn); }
