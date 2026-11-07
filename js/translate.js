@@ -3,7 +3,7 @@
 // browser's on-device translator when it's ready (recent desktop Chrome); otherwise the free MyMemory service (no
 // key, roughly 5,000 characters a day per device). Only the recognised text is sent, never the photo.
 
-import { nativeTranslate } from './native-vision.js';
+import { nativeTranslate, nativeOnline, nativeOnlineAvailable } from './native-vision.js';
 
 const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
 const MAX_BYTES = 450; // MyMemory accepts up to 500 bytes per request
@@ -113,7 +113,18 @@ export async function translateLive(lines, from, to) {
   if (missing.length) {
     const device = await nativeTranslate(missing, from, to);
     let results = device?.status === 'done' ? device.translations : null;
-    if (!results && device?.status === 'downloading') return { status: 'downloading' };
+    if (!results && device?.status === 'downloading') {
+      // The phone is still getting the language: translate online meanwhile (the lines are kept, so each is sent once).
+      // Not kept in the cache: once the phone has the language, it translates these itself.
+      const batch = missing.slice(0, 12);
+      try {
+        results = await translateOnline(batch, from, to);
+      } catch (error) {
+        return { status: 'downloading', error: device.error, onlineError: String(error?.message || error) };
+      }
+      const online = new Map(batch.map((line, i) => [line, results[i] || line]));
+      return { status: 'online', translations: lines.map((line) => cache.get(key(line)) ?? online.get(line)) };
+    }
     if (!results) {
       const browser = await browserTranslator(from, to);
       if (!browser) return { status: 'unavailable' };
@@ -202,17 +213,41 @@ const isNetworkError = (error) => error?.name === 'AbortError' || error instance
 
 async function requestOnce(text, from, to) {
   const url = `${MYMEMORY_URL}?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(`${serviceCode(from)}|${serviceCode(to)}`)}&mt=1`;
+  const { status, json } = await fetchTranslation(url);
+  if (status === 429) throw new Error('the online translator is busy (too many requests from your network). Try again in a few minutes');
+  if (status >= 500) throw new TypeError(`network: the online translator isn’t working right now (${status})`);
+  const fallback = json?.responseData?.translatedText;
+  if (Number(json?.responseStatus) !== 200 || !fallback) {
+    throw new Error(json?.responseDetails || `Translation failed (${json?.responseStatus || status})`);
+  }
+  if (/MYMEMORY WARNING|QUOTA/i.test(fallback)) throw new Error('Daily free translation limit reached. Try again tomorrow.');
+  return decodeEntities(pickTranslation(text, json) || fallback);
+}
+
+/** GET the service: through the Android app where it can (no cross-site rules, real errors), else from the page. */
+async function fetchTranslation(url) {
+  const parse = (body) => {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return null;
+    }
+  };
+  if (await nativeOnlineAvailable()) {
+    let reply;
+    try {
+      reply = await nativeOnline(url);
+    } catch (error) {
+      // A TypeError, like fetch's, so it's tried again and reported as a connection problem.
+      throw new TypeError(`network: ${String(error?.message || error).replace(/^network: /, '')}`);
+    }
+    return { status: Number(reply?.status) || 0, json: parse(reply?.body || '') };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const response = await fetch(url, { signal: controller.signal });
-    const json = await response.json();
-    const fallback = json?.responseData?.translatedText;
-    if (Number(json?.responseStatus) !== 200 || !fallback) {
-      throw new Error(json?.responseDetails || `Translation failed (${json?.responseStatus || response.status})`);
-    }
-    if (/MYMEMORY WARNING|QUOTA/i.test(fallback)) throw new Error('Daily free translation limit reached. Try again tomorrow.');
-    return decodeEntities(pickTranslation(text, json) || fallback);
+    return { status: response.status, json: parse(await response.text()) };
   } finally {
     clearTimeout(timer);
   }

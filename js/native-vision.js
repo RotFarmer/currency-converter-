@@ -87,6 +87,35 @@ export async function nativeTranslate(texts, from, to) {
   }
 }
 
+/**
+ * Build 17+: get these languages ready to translate offline (downloads start for the missing ones) and say where each
+ * is: { languages: { fr: { state: 'ready'|'downloading'|'unsupported', error? } }, system: [Android's download
+ * service rows: { status, reason, bytes, total }] }. Null in a browser or an older app.
+ */
+export async function nativeLanguages(languages) {
+  const info = await nativeVision();
+  if (!info?.languages) return null;
+  const sent = new Map(languages.map((lang) => [TRANSLATE_CODE[lang] || lang, lang]));
+  try {
+    const result = await plugin('languages', { languages: [...sent.keys()] });
+    const states = {};
+    for (const [code, state] of Object.entries(result?.languages || {})) states[sent.get(code) || code] = state;
+    return { languages: states, system: Array.isArray(result?.system) ? result.system : [] };
+  } catch {
+    return null;
+  }
+}
+
+/** Build 17+: whether online translation requests go through the app (see nativeOnline). */
+export async function nativeOnlineAvailable() {
+  return Boolean((await nativeVision())?.online);
+}
+
+/** An online translation request made by the app itself: { status, body }. Throws when it can't get through. */
+export function nativeOnline(url) {
+  return plugin('online', { url });
+}
+
 /** The language of some text on the device (such as "fr"), or null. */
 export async function nativeIdentify(text) {
   const info = await nativeVision();

@@ -16,7 +16,7 @@ import { getRates, ratesAreStale, refreshRates, convert } from './rates.js';
 import { formatMoney, formatRate, formatInputNumber, parseUserNumber, parseAmountEntry, timeAgo, formatDateTime } from './format.js';
 import { findPrices, resolveCurrency } from './price-parser.js';
 import { photoToCanvas, preloadOcr, readText, lastEngine } from './ocr.js';
-import { nativeVision, nativeIdentify, nativeTranslate, scriptForCurrencies } from './native-vision.js';
+import { nativeVision, nativeIdentify, nativeTranslate, nativeLanguages, scriptForCurrencies } from './native-vision.js';
 import { cameraSupported, startCamera, stopCamera, torchSupported, setTorch, grabFrame } from './camera.js';
 import { readPrices, identifyLanguage, readInLanguage, mergePrices } from './scan.js';
 import { textLines, labelFor } from './layout.js';
@@ -24,7 +24,7 @@ import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, language
 import { translateLines, translateLive, translationMethod, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v36'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v37'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -1619,7 +1619,10 @@ async function translateScan(live = () => true) {
     scan.translateStatus = 'failed';
     const message = String(error?.message || '');
     if (!navigator.onLine) scan.translateError = 'you’re offline';
-    else if (/fetch|network|abort|timeout|load failed/i.test(message)) scan.translateError = 'couldn’t reach the online translator';
+    else if (error instanceof TypeError || error?.name === 'AbortError' || /^(network:|failed to fetch|load failed)|timeout/i.test(message)) {
+      const detail = message.startsWith('network: ') ? ` (${message.slice(9)})` : '';
+      scan.translateError = `couldn’t reach the online translator${detail}`;
+    }
     else scan.translateError = message || 'unknown error';
   }
   renderScan();
@@ -1900,6 +1903,7 @@ const live = {
   langCheckedAt: 0,
   probe: 0,
   translations: new Map(), // "lang|text" → translation
+  fromOnline: new Set(), // the ones translated online while the phone got the language: redone on the phone once it has it
   translating: false,
   translateState: '',
   retryAt: 0,
@@ -2164,6 +2168,12 @@ async function requestLiveTranslations() {
   const from = live.lang;
   const to = settings.translateTo;
   if (baseLanguage(from) === baseLanguage(to)) return;
+  // The phone has the language now: the lines translated online meanwhile are done again on the phone.
+  if (live.fromOnline.size && offlineLanguages.get(`${from}>${to}`) === 'ready') {
+    for (const key of live.fromOnline) live.translations.delete(key);
+    live.fromOnline.clear();
+    live.translateState = '';
+  }
   const missing = [...new Set(live.lineTracks.filter((track) => track.hits >= 2 && !liveTranslation(track.text)).map((track) => track.text))].slice(0, 30);
   if (!missing.length) return;
   const session = live.session;
@@ -2172,8 +2182,19 @@ async function requestLiveTranslations() {
     const result = await translateLive(missing, from, to);
     if (session !== live.session) return;
     live.translateState = result.status;
-    if (result.status === 'done') missing.forEach((text, i) => live.translations.set(`${from}|${text}`, result.translations[i]));
-    else live.retryAt = performance.now() + 3000; // downloading or unavailable: look again in a moment
+    if (result.status === 'done' || result.status === 'online') {
+      // translations come back for all the lines asked for (online: the ones it got to; the rest next time)
+      missing.forEach((text, i) => {
+        if (result.translations[i] == null) return;
+        live.translations.set(`${from}|${text}`, result.translations[i]);
+        if (result.status === 'online') live.fromOnline.add(`${from}|${text}`);
+      });
+      live.onlineError = '';
+      if (result.status === 'online') live.retryAt = performance.now() + 1500;
+    } else {
+      live.onlineError = result.onlineError || '';
+      live.retryAt = performance.now() + 3000; // downloading or unavailable: look again in a moment
+    }
   } catch {
     live.translateState = 'unavailable';
     live.retryAt = performance.now() + 3000;
@@ -2197,7 +2218,8 @@ function updateLiveStatus() {
   let text;
   if (!live.lang) text = 'Point at text to translate';
   else if (baseLanguage(live.lang) === baseLanguage(settings.translateTo)) text = `Already in ${to}`;
-  else if (live.translateState === 'downloading') text = `Getting ${languageName(live.lang)} ready (once, about 30 MB)…`;
+  else if (live.translateState === 'online') text = `${languageName(live.lang)} → ${to}, online until ${languageName(live.lang)} is downloaded${downloadNote()}`;
+  else if (live.translateState === 'downloading') text = `Getting ${languageName(live.lang)} ready (once, about 30 MB)${downloadNote()}${live.onlineError ? `. Online: ${live.onlineError}` : ''}`;
   else if (live.translateState === 'unavailable') text = `${languageName(live.lang)} can’t be translated live: use the shutter`;
   else text = `${languageName(live.lang)} → ${to}`;
   setCameraStatus(prices ? `${text} · ${prices}` : text);
@@ -2426,15 +2448,18 @@ $('#lang-status').addEventListener('click', () => {
 // The phone translates a language once it has downloaded it (about 30 MB, once). The app gets the likely ones as soon
 // as it opens, so the camera can translate straight away instead of waiting for a download.
 const offlineLanguages = new Map(); // "fr>en" → 'ready' | 'downloading'
+const downloadErrors = new Map(); // "fr" → why its last download failed
+let systemDownloads = []; // what Android's download service is doing with them (build 17+)
 let prepareTimer = 0;
 let lastLikelyLanguages = '';
 
-/** The languages you're likely to read: where you are, your other currencies' and the ones you've translated lately. */
+/** The languages you're likely to read: where you are, your currencies' and the ones you've translated lately. */
 function likelyLanguages() {
-  const region = settings.autoSource ? settings.sourceRegion : null;
-  const fromCurrencies = [languageForCurrency(settings.source, region), ...settings.extra.slice(0, 3).map((code) => languageForCurrency(code))];
+  const clockRegion = regionForTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const region = (settings.autoSource && settings.sourceRegion) || clockRegion;
+  const fromCurrencies = [settings.source, ...settings.extra].map((code) => languageForCurrency(code, region));
   const to = baseLanguage(settings.translateTo);
-  return [...new Set([...fromCurrencies, ...settings.recentLanguages])].filter((lang) => lang && baseLanguage(lang) !== to).slice(0, 6);
+  return [...new Set([...fromCurrencies, ...settings.recentLanguages])].filter((lang) => lang && baseLanguage(lang) !== to).slice(0, 8);
 }
 
 function rememberLanguage(lang) {
@@ -2453,6 +2478,27 @@ function prepareTranslators({ delay = 0 } = {}) {
     if (!settings.translate || !(await nativeVision())?.translate) return;
     const to = settings.translateTo;
     let downloading = false;
+    // Build 17+: one call starts the downloads and says where each one is, Android's download service included.
+    const report = await nativeLanguages([...likelyLanguages(), to]);
+    if (report) {
+      const target = report.languages[to]?.state;
+      for (const lang of likelyLanguages()) {
+        const state = report.languages[lang]?.state;
+        const key = `${lang}>${to}`;
+        if (state === 'ready' && target === 'ready') offlineLanguages.set(key, 'ready');
+        else if (state === 'ready' || state === 'downloading') offlineLanguages.set(key, 'downloading');
+        else offlineLanguages.delete(key);
+        const error = report.languages[lang]?.error || report.languages[to]?.error;
+        if (error && offlineLanguages.get(key) === 'downloading') downloadErrors.set(lang, error);
+        else downloadErrors.delete(lang);
+        downloading ||= offlineLanguages.get(key) === 'downloading';
+      }
+      systemDownloads = report.system;
+      renderOfflineLanguages();
+      if (!cameraEl.hidden) updateLiveStatus();
+      if (downloading) prepareTranslators({ delay: 5000 });
+      return;
+    }
     for (const lang of likelyLanguages()) {
       const key = `${lang}>${to}`;
       if (offlineLanguages.get(key) === 'ready') continue;
@@ -2468,16 +2514,38 @@ function prepareTranslators({ delay = 0 } = {}) {
   }, delay);
 }
 
-/** Settings → Translate to: which languages are ready to translate offline, and which are downloading. */
+/** Settings → Translate to: which languages are ready to translate offline, which are downloading, and how that's going. */
 function renderOfflineLanguages() {
   const hint = $('#offline-languages');
   const to = settings.translateTo;
   const named = (state) => likelyLanguages().filter((lang) => offlineLanguages.get(`${lang}>${to}`) === state).map(languageName);
   const parts = [];
   if (settings.translate && named('ready').length) parts.push(`Ready offline: ${named('ready').join(', ')}`);
-  if (settings.translate && named('downloading').length) parts.push(`Downloading: ${named('downloading').join(', ')}`);
+  if (settings.translate && named('downloading').length) parts.push(`Downloading: ${named('downloading').join(', ')}${downloadNote()}`);
   hint.hidden = !parts.length;
   hint.textContent = parts.join(' · ');
+}
+
+/** How the language downloads are going, from Android's download service (build 17+): " (12 of 31 MB)", why it's held… */
+function downloadNote() {
+  const mb = (bytes) => Math.max(1, Math.round(bytes / 1048576));
+  const rows = systemDownloads;
+  const failed = rows.find((row) => row.status === 'failed');
+  const held = rows.find((row) => row.status === 'paused' || row.status === 'pending');
+  const running = rows.filter((row) => row.status === 'running');
+  const error = [...downloadErrors.values()][0];
+  if (running.length) {
+    const bytes = running.reduce((sum, row) => sum + Math.max(0, row.bytes || 0), 0);
+    const total = running.reduce((sum, row) => sum + Math.max(0, row.total || 0), 0);
+    return total > 0 ? ` (${mb(bytes)} of ${mb(total)} MB)` : ' (started)';
+  }
+  if (held?.status === 'paused' && held.reason === 3) return ' (Android is holding it until you’re on Wi‑Fi)';
+  if (held?.status === 'paused' && held.reason === 2) return ' (waiting for a connection)';
+  if (held?.status === 'paused' && held.reason === 1) return ' (Android will try again shortly)';
+  if (held) return ' (waiting in Android’s download queue)';
+  if (failed) return ` (Android’s download service failed: code ${failed.reason}; trying again)`;
+  if (error) return ` (couldn’t download: ${error}; trying again)`;
+  return '';
 }
 
 // A check that goes stale as soon as a new photo or language choice comes in.

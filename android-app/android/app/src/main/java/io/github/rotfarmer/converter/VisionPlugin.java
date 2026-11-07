@@ -1,5 +1,8 @@
 package io.github.rotfarmer.converter;
 
+import android.app.DownloadManager;
+import android.content.Context;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Rect;
@@ -32,6 +35,11 @@ import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions;
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions;
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,7 +62,11 @@ public class VisionPlugin extends Plugin {
 
     private final Map<String, TextRecognizer> recognizers = new HashMap<>();
     private final Map<String, Translator> translators = new HashMap<>();
+    /** Languages whose model is being downloaded (ML Kit codes), and the last download error for each. */
     private final Set<String> downloading = new HashSet<>();
+    private final Map<String, String> downloadErrors = new HashMap<>();
+    /** Online translation requests may only go here. */
+    private static final String ONLINE_TRANSLATOR = "https://api.mymemory.translated.net/";
     private LanguageIdentifier identifier;
 
     /** What this app can do on the device: the scripts it reads, and translation. */
@@ -63,6 +75,9 @@ public class VisionPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("scripts", new JSArray(SCRIPTS));
         result.put("translate", true);
+        // Build 17+: languages() reports downloads, online() makes online translation requests.
+        result.put("languages", true);
+        result.put("online", true);
         call.resolve(result);
     }
 
@@ -191,8 +206,12 @@ public class VisionPlugin extends Plugin {
                 boolean ready = (TranslateLanguage.ENGLISH.equals(from) || downloaded(hasFrom))
                     && (TranslateLanguage.ENGLISH.equals(to) || downloaded(hasTo));
                 if (!ready) {
-                    download(key, translator);
-                    call.resolve(status("downloading"));
+                    if (!TranslateLanguage.ENGLISH.equals(from) && !downloaded(hasFrom)) startDownload(from);
+                    if (!TranslateLanguage.ENGLISH.equals(to) && !downloaded(hasTo)) startDownload(to);
+                    JSObject result = status("downloading");
+                    String error = lastError(from, to);
+                    if (error != null) result.put("error", error);
+                    call.resolve(result);
                     return;
                 }
                 List<Task<String>> tasks = new ArrayList<>();
@@ -224,16 +243,162 @@ public class VisionPlugin extends Plugin {
         return translator;
     }
 
-    /** Downloads a language pair's models in the background (any connection; about 30 MB per language). */
-    private synchronized void download(String key, Translator translator) {
-        if (downloading.contains(key)) return;
-        downloading.add(key);
-        translator.downloadModelIfNeeded(new DownloadConditions.Builder().build())
-            .addOnCompleteListener(task -> {
-                synchronized (VisionPlugin.this) {
-                    downloading.remove(key);
+    /**
+     * Downloads a language's model in the background (about 30 MB): over any connection, mobile data included. ML Kit
+     * hands the download to Android's download service; a failure is kept to report, and the next check tries again.
+     */
+    private synchronized void startDownload(String language) {
+        if (downloading.contains(language)) return;
+        downloading.add(language);
+        try {
+            RemoteModelManager.getInstance()
+                .download(new TranslateRemoteModel.Builder(language).build(), new DownloadConditions.Builder().build())
+                .addOnSuccessListener(done -> {
+                    synchronized (VisionPlugin.this) {
+                        downloadErrors.remove(language);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    synchronized (VisionPlugin.this) {
+                        downloadErrors.put(language, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                    }
+                })
+                .addOnCompleteListener(task -> {
+                    synchronized (VisionPlugin.this) {
+                        downloading.remove(language);
+                    }
+                });
+        } catch (Throwable t) {
+            downloading.remove(language);
+            downloadErrors.put(language, t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+        }
+    }
+
+    private synchronized String lastError(String... languages) {
+        for (String language : languages) if (downloadErrors.containsKey(language)) return downloadErrors.get(language);
+        return null;
+    }
+
+    /**
+     * Gets languages ready to translate offline: starts downloading the ones that aren't on the phone, and says where
+     * each one is ({ fr: { state: "ready" | "downloading" | "unsupported", error? } }), plus what Android's download
+     * service is doing with the downloads ({ system: [{ status, reason, bytes, total, uri }] }): that's where a
+     * download that doesn't start is held (waiting for Wi-Fi or a connection) or says why it failed.
+     */
+    @PluginMethod
+    public void languages(PluginCall call) {
+        try {
+            JSArray tags = call.getArray("languages", new JSArray());
+            RemoteModelManager models = RemoteModelManager.getInstance();
+            Map<String, String> codes = new HashMap<>(); // tag → ML Kit code
+            Map<String, Task<Boolean>> checks = new HashMap<>();
+            for (int i = 0; i < tags.length(); i++) {
+                String tag = tags.optString(i, "");
+                String code = TranslateLanguage.fromLanguageTag(base(tag));
+                codes.put(tag, code);
+                if (code != null && !TranslateLanguage.ENGLISH.equals(code)) {
+                    checks.put(tag, models.isModelDownloaded(new TranslateRemoteModel.Builder(code).build()));
+                }
+            }
+            Tasks.whenAllComplete(checks.values()).addOnCompleteListener(done -> {
+                try {
+                    JSObject states = new JSObject();
+                    for (Map.Entry<String, String> entry : codes.entrySet()) {
+                        String tag = entry.getKey();
+                        String code = entry.getValue();
+                        JSObject state = new JSObject();
+                        if (code == null) {
+                            state.put("state", "unsupported");
+                        } else if (TranslateLanguage.ENGLISH.equals(code) || downloaded(checks.get(tag))) {
+                            state.put("state", "ready");
+                        } else {
+                            startDownload(code);
+                            state.put("state", "downloading");
+                            String error = lastError(code);
+                            if (error != null) state.put("error", error);
+                        }
+                        states.put(tag, state);
+                    }
+                    JSObject result = new JSObject();
+                    result.put("languages", states);
+                    result.put("system", systemDownloads());
+                    call.resolve(result);
+                } catch (Throwable t) {
+                    CrashLog.caught(getContext(), "translation languages", t);
+                    call.reject("Couldn't check the languages");
                 }
             });
+        } catch (Throwable t) {
+            CrashLog.caught(getContext(), "translation languages", t);
+            call.reject("Couldn't check the languages");
+        }
+    }
+
+    /** This app's downloads in Android's download service that haven't finished (ML Kit's language models). */
+    private JSArray systemDownloads() {
+        JSArray out = new JSArray();
+        DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) return out;
+        DownloadManager.Query query = new DownloadManager.Query().setFilterByStatus(
+            DownloadManager.STATUS_PENDING | DownloadManager.STATUS_RUNNING | DownloadManager.STATUS_PAUSED | DownloadManager.STATUS_FAILED);
+        try (Cursor cursor = manager.query(query)) {
+            while (cursor != null && cursor.moveToNext()) {
+                JSObject row = new JSObject();
+                int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                row.put("status", status == DownloadManager.STATUS_PENDING ? "pending"
+                    : status == DownloadManager.STATUS_RUNNING ? "running"
+                    : status == DownloadManager.STATUS_PAUSED ? "paused" : "failed");
+                row.put("reason", cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)));
+                row.put("bytes", cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)));
+                row.put("total", cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)));
+                String uri = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_URI));
+                if (uri != null) row.put("uri", uri);
+                out.put(row);
+            }
+        } catch (Throwable t) {
+            CrashLog.caught(getContext(), "download service", t);
+        }
+        return out;
+    }
+
+    /**
+     * An online translation request (the free MyMemory service), made here rather than in the web page so it isn't
+     * subject to the page's cross-site rules and its real HTTP status comes back: { status, body }.
+     */
+    @PluginMethod
+    public void online(PluginCall call) {
+        String address = call.getString("url", "");
+        if (address == null || !address.startsWith(ONLINE_TRANSLATOR)) {
+            call.reject("Not the translator");
+            return;
+        }
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(address).openConnection();
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(15000);
+                int code = connection.getResponseCode();
+                InputStream in = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
+                ByteArrayOutputStream body = new ByteArrayOutputStream();
+                if (in != null) {
+                    try (InputStream stream = in) {
+                        byte[] buffer = new byte[16 * 1024];
+                        int n;
+                        while ((n = stream.read(buffer)) > 0 && body.size() < 512 * 1024) body.write(buffer, 0, n);
+                    }
+                }
+                JSObject result = new JSObject();
+                result.put("status", code);
+                result.put("body", new String(body.toByteArray(), StandardCharsets.UTF_8));
+                call.resolve(result);
+            } catch (Throwable t) {
+                String reason = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+                call.reject("network: " + reason);
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
     }
 
     /** The language of some text (a tag such as "fr"), or null when it can't tell. */
