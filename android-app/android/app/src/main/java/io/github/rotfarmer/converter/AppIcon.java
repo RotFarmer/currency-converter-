@@ -4,11 +4,14 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.Build;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The app's icon follows the theme: each theme has a launcher entry (an activity-alias in the manifest), and only the
- * chosen one is switched on. The web app says which theme (setIcon); the switch happens when you leave the app, since
- * launchers redraw (and some briefly close the app) when it changes.
+ * chosen one is switched on. The web app says which theme (setIcon). Android closes the app when the entry it was
+ * opened from is switched off, so the switch waits until you've been away from the app for a minute (IconJobService).
  */
 final class AppIcon {
     private static final String PREFS = "app_icon";
@@ -25,29 +28,67 @@ final class AppIcon {
         prefs(context).edit().putString("theme", theme == null ? "hud" : theme).apply();
     }
 
-    /** Switch to the chosen theme's icon, if it changed. Never throws. */
+    /** Whether the launcher shows another theme's icon than the chosen one. Never throws. */
+    static boolean needsChange(Context context) {
+        try {
+            return !changes(context).isEmpty();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** Switch to the chosen theme's icon, if it changed. This may close the app (see above). Never throws. */
     static void apply(Context context) {
         try {
-            String wanted = entryFor(prefs(context).getString("theme", "hud"));
+            List<Change> changes = changes(context);
+            if (changes.isEmpty()) return;
             PackageManager pm = context.getPackageManager();
-            // Switch the new one on first, so there's always an icon.
-            set(context, pm, wanted, true);
-            set(context, pm, DEFAULT, wanted.equals(DEFAULT));
-            for (String theme : THEMES) set(context, pm, entry(theme), entry(theme).equals(wanted));
+            if (Build.VERSION.SDK_INT >= 33) {
+                // All at once: there's never no icon, or two.
+                List<PackageManager.ComponentEnabledSetting> settings = new ArrayList<>();
+                for (Change change : changes) {
+                    settings.add(new PackageManager.ComponentEnabledSetting(change.component, change.state, PackageManager.DONT_KILL_APP));
+                }
+                pm.setComponentEnabledSettings(settings);
+            } else {
+                // The new one is first in the list, so there's always an icon.
+                for (Change change : changes) pm.setComponentEnabledSetting(change.component, change.state, PackageManager.DONT_KILL_APP);
+            }
         } catch (Throwable t) {
             CrashLog.caught(context, "app icon", t);
         }
     }
 
-    private static void set(Context context, PackageManager pm, String entry, boolean on) {
-        ComponentName component = new ComponentName(context.getPackageName(), PACKAGE + entry);
-        boolean onByDefault = entry.equals(DEFAULT);
-        // "Default" is the manifest's own setting: use it where it matches, so nothing is stored that needn't be.
-        int state = on == onByDefault
-            ? PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
-            : on ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-        if (pm.getComponentEnabledSetting(component) == state) return;
-        pm.setComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP);
+    private static final class Change {
+        final ComponentName component;
+        final int state;
+
+        Change(ComponentName component, int state) {
+            this.component = component;
+            this.state = state;
+        }
+    }
+
+    /** The entries to switch on or off for the chosen theme: the one to switch on first. */
+    private static List<Change> changes(Context context) {
+        String wanted = entryFor(prefs(context).getString("theme", "hud"));
+        PackageManager pm = context.getPackageManager();
+        List<Change> changes = new ArrayList<>();
+        List<String> entries = new ArrayList<>();
+        entries.add(wanted);
+        if (!wanted.equals(DEFAULT)) entries.add(DEFAULT);
+        for (String theme : THEMES) if (!entry(theme).equals(wanted)) entries.add(entry(theme));
+        for (String entry : entries) {
+            ComponentName component = new ComponentName(context.getPackageName(), PACKAGE + entry);
+            boolean on = entry.equals(wanted);
+            boolean onByDefault = entry.equals(DEFAULT);
+            // "Default" is the manifest's own setting: use it where it matches, so nothing is stored that needn't be.
+            int state = on == onByDefault
+                ? PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+                : on ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+            if (pm.getComponentEnabledSetting(component) != state) changes.add(new Change(component, state));
+        }
+        return changes;
     }
 
     private static String entryFor(String theme) {

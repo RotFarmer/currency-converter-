@@ -105,6 +105,7 @@ public class ConverterActivity extends BridgeActivity {
         super.onStart();
         visible = true;
         handler.removeCallbacks(installWhenAway);
+        IconJobService.cancel(this);
     }
 
     @Override
@@ -113,8 +114,8 @@ public class ConverterActivity extends BridgeActivity {
         visible = false;
         CrashLog.settle(this);
         if (!reportOnly && Updater.canUpdateQuietly(this)) handler.postDelayed(installWhenAway, INSTALL_AFTER_LEAVING_MS);
-        // A new theme's icon goes on the home screen while you're away, so the launcher redrawing it doesn't get in the way.
-        if (!reportOnly) AppIcon.apply(this);
+        // A new theme's icon goes on the home screen once you've been away a minute (it closes the app).
+        if (!reportOnly && !safeMode) IconJobService.schedule(this);
     }
 
     @Override

@@ -73,7 +73,7 @@ final class CrashLog {
     /** You left the app, so it didn't die while opening. */
     static void settle(Context context) {
         try {
-            prefs(context).edit().putBoolean(STARTING, false).apply();
+            prefs(context).edit().putBoolean(STARTING, false).commit();
         } catch (Throwable ignored) {
             // nothing to settle
         }
