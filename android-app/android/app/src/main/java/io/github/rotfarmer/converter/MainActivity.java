@@ -51,11 +51,21 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Lets the web app send the home-screen widgets their data, and check for app updates.
         registerPlugin(WidgetBridgePlugin.class);
-        int quickCrashes = CrashLog.quickCrashes(this);
-        report = pageCrashReport != null ? pageCrashReport : CrashLog.take(this, CrashLog.CRASH, true);
+        int quickCrashes = CrashLog.beginLaunch(this);
+        if (pageCrashReport != null) {
+            report = pageCrashReport;
+        } else {
+            // What went wrong last time: the crash handler's report (Java) and Android's own record (any crash).
+            report = join(CrashLog.take(this, CrashLog.CRASH, true), CrashLog.lastExitReport(this));
+            if (report == null && quickCrashes >= 1) {
+                report = "Converter closed straight after opening last time, without leaving any details. " + CrashLog.device(this);
+            }
+        }
         safeMode = pageCrashReport != null || quickCrashes >= 1;
         reportOnly = pageCrashReport == null && quickCrashes >= 2;
         pageCrashReport = null;
+        // The report screen itself is safe: leaving it shouldn't count as another crash.
+        if (reportOnly) CrashLog.settle(this);
 
         super.onCreate(savedInstanceState); // calls load()
 
@@ -99,6 +109,7 @@ public class MainActivity extends BridgeActivity {
     public void onStop() {
         super.onStop();
         visible = false;
+        CrashLog.settle(this);
         if (!reportOnly && Updater.canUpdateQuietly(this)) handler.postDelayed(installWhenAway, INSTALL_AFTER_LEAVING_MS);
     }
 
@@ -152,6 +163,12 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private static String join(String a, String b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return a + "\n\n" + b;
+    }
+
     private String safeUrl() {
         String base = bridge.getServerUrl();
         if (base == null || base.isEmpty()) base = bridge.getAppUrl();
@@ -189,7 +206,7 @@ public class MainActivity extends BridgeActivity {
         column.addView(title);
 
         TextView hint = new TextView(this);
-        hint.setText("It closed right after opening twice in a row. Tap Copy details and send them to get this fixed, or try again.");
+        hint.setText("It closed right after opening several times in a row. Tap Copy details and send them to get this fixed, or try again.");
         hint.setTextSize(16);
         hint.setTextColor(0xFFCFD8DC);
         hint.setPadding(0, Math.round(10 * dp), 0, Math.round(16 * dp));
