@@ -51,6 +51,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Lets the web app send the home-screen widgets their data, and check for app updates.
         registerPlugin(WidgetBridgePlugin.class);
+        // Reads and translates text on the device for the camera and photo scans.
+        registerPlugin(VisionPlugin.class);
         int quickCrashes = CrashLog.beginLaunch(this);
         if (pageCrashReport != null) {
             report = pageCrashReport;
