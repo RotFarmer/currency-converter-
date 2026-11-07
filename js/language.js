@@ -266,6 +266,44 @@ const LANGUAGE_CURRENCIES = {
  * The currency a language suggests. If the user's "prices in" currency is one of the
  * possibilities (Spanish text while in Mexico), that one is kept.
  */
+// The language prices in a currency are most likely written in. A currency several countries share (the euro, the
+// Swiss franc) goes by the country, when it's known.
+const CURRENCY_LANGUAGE = {
+  JPY: 'ja', CNY: 'zh', TWD: 'zh-TW', HKD: 'zh-TW', MOP: 'zh-TW', KRW: 'ko', THB: 'th', ILS: 'he', IRR: 'fa',
+  RUB: 'ru', BYN: 'ru', KZT: 'ru', KGS: 'ru', UAH: 'uk', INR: 'hi', NPR: 'hi',
+  AED: 'ar', SAR: 'ar', EGP: 'ar', QAR: 'ar', KWD: 'ar', BHD: 'ar', OMR: 'ar', JOD: 'ar', IQD: 'ar', LBP: 'ar',
+  TND: 'ar', DZD: 'ar', LYD: 'ar', MAD: 'ar',
+  VND: 'vi', IDR: 'id', MYR: 'ms', PHP: 'tl', TRY: 'tr', PLN: 'pl', CZK: 'cs', HUF: 'hu', RON: 'ro', SEK: 'sv',
+  NOK: 'nb', DKK: 'da', BRL: 'pt', MXN: 'es', ARS: 'es', CLP: 'es', COP: 'es', PEN: 'es', UYU: 'es', BOB: 'es',
+  PYG: 'es', CRC: 'es', DOP: 'es', GTQ: 'es', HNL: 'es', NIO: 'es', VES: 'es',
+  USD: 'en', GBP: 'en', AUD: 'en', NZD: 'en',
+};
+const REGION_LANGUAGE = {
+  FR: 'fr', MC: 'fr', LU: 'fr', DE: 'de', AT: 'de', LI: 'de', CH: 'de', IT: 'it', SM: 'it', VA: 'it', ES: 'es', AD: 'es',
+  PT: 'pt', NL: 'nl', FI: 'fi', IE: 'en', MT: 'en', GR: 'el', CY: 'el', SK: 'sk', SI: 'sl', HR: 'hr',
+};
+
+/** The language prices in this currency are most likely in (region: the country, for shared currencies), or null. */
+export function languageForCurrency(code, region) {
+  if (CURRENCY_LANGUAGE[code]) return CURRENCY_LANGUAGE[code];
+  if (['EUR', 'CHF'].includes(code)) return REGION_LANGUAGE[region] || null;
+  return null;
+}
+
+/** The first language the currencies (most likely first) suggest, or null. */
+export function languageForCurrencies(codes = [], region) {
+  for (const code of codes) {
+    const lang = languageForCurrency(code, region);
+    if (lang) return lang;
+  }
+  return null;
+}
+
+/** Whether a language is written in the Latin alphabet. */
+export function isLatinLanguage(lang) {
+  return Boolean(lang) && !['ja', 'zh', 'zh-TW', 'ko', 'th', 'he', 'ar', 'fa', 'ur', 'ru', 'uk', 'sr', 'kk', 'el', 'hi'].includes(lang);
+}
+
 export function currencyForLanguage(lang, preferred) {
   const list = LANGUAGE_CURRENCIES[lang];
   if (!list) return null;

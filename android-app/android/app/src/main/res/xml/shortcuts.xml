@@ -9,7 +9,7 @@
         android:shortcutShortLabel="@string/shortcut_camera_short">
         <intent
             android:action="io.github.rotfarmer.converter.OPEN_CAMERA"
-            android:targetClass="io.github.rotfarmer.converter.MainActivity"
+            android:targetClass="io.github.rotfarmer.converter.ConverterActivity"
             android:targetPackage="io.github.rotfarmer.converter" />
     </shortcut>
 </shortcuts>

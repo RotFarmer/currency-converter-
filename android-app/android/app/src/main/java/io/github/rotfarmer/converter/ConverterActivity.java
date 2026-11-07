@@ -22,7 +22,7 @@ import android.widget.Toast;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
 
-public class MainActivity extends BridgeActivity {
+public class ConverterActivity extends BridgeActivity {
 
     static final String ACTION_OPEN_CAMERA = "io.github.rotfarmer.converter.OPEN_CAMERA";
     /** After you leave the app for this long (not just to take a photo), a waiting update installs by itself. */
@@ -113,6 +113,8 @@ public class MainActivity extends BridgeActivity {
         visible = false;
         CrashLog.settle(this);
         if (!reportOnly && Updater.canUpdateQuietly(this)) handler.postDelayed(installWhenAway, INSTALL_AFTER_LEAVING_MS);
+        // A new theme's icon goes on the home screen while you're away, so the launcher redrawing it doesn't get in the way.
+        if (!reportOnly) AppIcon.apply(this);
     }
 
     @Override

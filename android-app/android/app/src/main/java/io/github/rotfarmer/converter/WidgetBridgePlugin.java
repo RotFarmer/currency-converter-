@@ -44,6 +44,17 @@ public class WidgetBridgePlugin extends Plugin {
         call.resolve();
     }
 
+    /** The theme changed (or "App icon follows the theme" did): the icon to show from the next time you leave the app. */
+    @PluginMethod
+    public void setIcon(PluginCall call) {
+        try {
+            AppIcon.choose(getContext(), call.getString("theme", "hud"));
+        } catch (Throwable t) {
+            CrashLog.caught(getContext(), "app icon", t);
+        }
+        call.resolve();
+    }
+
     /** The last crash (once) and the last error the app caught and carried on from, for Settings → App. */
     @PluginMethod
     public void diagnostics(PluginCall call) {
@@ -59,7 +70,7 @@ public class WidgetBridgePlugin extends Plugin {
     @PluginMethod
     public void takeLaunchAction(PluginCall call) {
         JSObject result = new JSObject();
-        String action = MainActivity.takePendingAction();
+        String action = ConverterActivity.takePendingAction();
         if (action != null) result.put("action", action);
         call.resolve(result);
     }
@@ -130,7 +141,8 @@ public class WidgetBridgePlugin extends Plugin {
                 call.resolve(result);
             } catch (Throwable e) {
                 Updater.lastStatus = "failed: " + e.getMessage();
-                call.reject("Couldn't download the update. Check your connection.");
+                String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                call.reject("Couldn't download the update (" + reason + "). Tap Install update to carry on where it stopped.");
             }
         }).start();
     }

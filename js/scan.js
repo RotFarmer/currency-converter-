@@ -12,6 +12,8 @@ import {
   detectLatinLanguage,
   modelForLanguage,
   webOnlyScriptFor,
+  languageForCurrencies,
+  isLatinLanguage,
 } from './language.js';
 import { detectLanguageOnDevice } from './translate.js';
 
@@ -61,6 +63,19 @@ const textOf = (lines) => lines.map((line) => line.text).join('\n');
 const count = (text, pattern) => [...text].filter((ch) => pattern.test(ch)).length;
 const letters = (lines) => count(textOf(lines), /\p{L}/u);
 const cjk = (lines) => count(textOf(lines), /[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]/u);
+const DEVICE_SCRIPT = { ja: 'japanese', ko: 'korean', zh: 'chinese', 'zh-TW': 'chinese', hi: 'devanagari' };
+const SHORT_TEXT = 30; // letters: below this, a language identified from the words alone is a guess
+
+/**
+ * Settle a Latin-alphabet language: a short text's language identified from its words is a guess, so the language the
+ * currency suggests wins; with no identification at all, the currency's language stands in.
+ */
+function settleLatinLanguage(identified, letterCount, currencyLanguage) {
+  const fromCurrency = isLatinLanguage(currencyLanguage) ? currencyLanguage : null;
+  if (!identified) return fromCurrency;
+  if (fromCurrency && identified !== fromCurrency && letterCount < SHORT_TEXT) return fromCurrency;
+  return identified;
+}
 
 /**
  * Work out the language with the phone's reader. Its readers skip scripts they don't know (rather than misreading
@@ -68,9 +83,17 @@ const cjk = (lines) => count(textOf(lines), /[\u3040-\u30ff\u4e00-\u9fff\uac00-\
  * look too. CJK and Devanagari text is recognised by its characters; Latin-alphabet text by the phone's language
  * identification. @returns {Promise<{lang, model, lines}|null>} null if cancelled
  */
-async function identifyOnDevice(canvas, lines, script, hintCurrencies, isCancelled) {
+async function identifyOnDevice(canvas, lines, script, hintCurrencies, isCancelled, region) {
   let best = { script, lines };
-  if (script === 'latin' && letters(lines) < 40) {
+  // The photo's currency suggests a language: read with its script first (yen signs: the Japanese reader).
+  const currencyLanguage = languageForCurrencies(hintCurrencies, region);
+  const currencyScript = DEVICE_SCRIPT[currencyLanguage];
+  if (currencyScript && currencyScript !== script) {
+    if (isCancelled()) return null;
+    const read = await nativeRead(canvas, currencyScript).catch(() => null);
+    if (read && letters(read) >= letters(best.lines)) best = { script: currencyScript, lines: read };
+  }
+  if (best.script === 'latin' && letters(best.lines) < 40) {
     for (const other of ['japanese', 'korean']) {
       if (isCancelled()) return null;
       const read = await nativeRead(canvas, other).catch(() => null);
@@ -89,8 +112,10 @@ async function identifyOnDevice(canvas, lines, script, hintCurrencies, isCancell
     const read = await nativeRead(canvas, wanted).catch(() => null);
     if (read) best = { script: wanted, lines: read };
   }
-  if (!lang && letters(best.lines) >= 6) {
-    lang = (await nativeIdentify(text)) || (await detectLanguageOnDevice(text)) || detectLatinLanguage(text);
+  const letterCount = letters(best.lines);
+  if (!lang && letterCount >= 3) {
+    const identified = letterCount >= 6 ? (await nativeIdentify(text)) || (await detectLanguageOnDevice(text)) || detectLatinLanguage(text) : null;
+    lang = settleLatinLanguage(identified, letterCount, currencyLanguage);
   }
   return { lang, model: best.script, lines: best.lines };
 }
@@ -102,28 +127,30 @@ async function identifyOnDevice(canvas, lines, script, hintCurrencies, isCancell
  * currency hints) and the one that reads the text best wins.
  * @returns {Promise<{lang: string|null, model: string, lines: object[]} | null>} null if cancelled
  */
-export async function identifyLanguage(canvas, englishLines, { hintCurrencies = [], onProbe, isCancelled, engine = 'web', script = 'eng' }) {
-  if (engine !== 'device') return identifyLanguageWeb(canvas, englishLines, { hintCurrencies, onProbe, isCancelled });
-  const device = await identifyOnDevice(canvas, englishLines, script, hintCurrencies, isCancelled);
+export async function identifyLanguage(canvas, englishLines, { hintCurrencies = [], onProbe, isCancelled, engine = 'web', script = 'eng', region = null }) {
+  if (engine !== 'device') return identifyLanguageWeb(canvas, englishLines, { hintCurrencies, onProbe, isCancelled, region });
+  const device = await identifyOnDevice(canvas, englishLines, script, hintCurrencies, isCancelled, region);
   if (!device) return null;
   const webScript = webOnlyScriptFor(hintCurrencies);
   if (device.lang && !webScript) return device;
   // The phone doesn't read Thai, Hebrew, Arabic, Cyrillic or Greek: the web reader works those out (slower).
   const webLines = await readWith(canvas, 'eng');
   if (!webLines || isCancelled()) return isCancelled() ? null : device;
-  const web = await identifyLanguageWeb(canvas, webLines, { hintCurrencies, onProbe, isCancelled });
+  const web = await identifyLanguageWeb(canvas, webLines, { hintCurrencies, onProbe, isCancelled, region });
   if (!web) return null;
   return web.lang ? web : device;
 }
 
-async function identifyLanguageWeb(canvas, englishLines, { hintCurrencies = [], onProbe, isCancelled }) {
+async function identifyLanguageWeb(canvas, englishLines, { hintCurrencies = [], onProbe, isCancelled, region = null }) {
   const unknown = { lang: null, model: 'eng', lines: englishLines };
+  const currencyLanguage = languageForCurrencies(hintCurrencies, region);
   let candidates;
   let minScore = MIN_SCORE;
 
   if (!looksLikeOtherScript(englishLines)) {
     const text = englishLines.map((line) => line.text).join('\n');
-    const lang = (await detectLanguageOnDevice(text)) || detectLatinLanguage(text);
+    const letterCount = count(text, /\p{L}/u);
+    const lang = settleLatinLanguage((await detectLanguageOnDevice(text)) || detectLatinLanguage(text), letterCount, letterCount >= 3 ? currencyLanguage : null);
     const words = englishLines.flatMap((line) => line.words).filter((w) => /\p{L}{2}/u.test(w.text)).length;
     if (lang) {
       // Read it again with that language's own model: accents and words come out right,

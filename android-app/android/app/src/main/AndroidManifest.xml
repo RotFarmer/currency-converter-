@@ -12,12 +12,22 @@
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
-            android:name=".MainActivity"
+            android:name=".ConverterActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:exported="true">
+            android:exported="true" />
 
+        <!-- The app's icon in the launcher: one entry per theme, only the current theme's switched on (AppIcon).
+             The HUD one keeps the old name, so home-screen icons from before stay put. -->
+        <activity-alias
+            android:name=".MainActivity"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:enabled="true"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -27,8 +37,241 @@
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconAurora"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_aurora"
+            android:roundIcon="@mipmap/ic_launcher_aurora_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
 
-        </activity>
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconMedieval"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_medieval"
+            android:roundIcon="@mipmap/ic_launcher_medieval_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconCottage"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_cottage"
+            android:roundIcon="@mipmap/ic_launcher_cottage_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconForest"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_forest"
+            android:roundIcon="@mipmap/ic_launcher_forest_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconOcean"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_ocean"
+            android:roundIcon="@mipmap/ic_launcher_ocean_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconIronbeetle"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_ironbeetle"
+            android:roundIcon="@mipmap/ic_launcher_ironbeetle_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconCloud"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_cloud"
+            android:roundIcon="@mipmap/ic_launcher_cloud_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconAero"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_aero"
+            android:roundIcon="@mipmap/ic_launcher_aero_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconRetro95"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_retro95"
+            android:roundIcon="@mipmap/ic_launcher_retro95_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconVapor"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_vapor"
+            android:roundIcon="@mipmap/ic_launcher_vapor_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconPixel"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_pixel"
+            android:roundIcon="@mipmap/ic_launcher_pixel_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconNotebook"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_notebook"
+            android:roundIcon="@mipmap/ic_launcher_notebook_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".IconPet"
+            android:targetActivity=".ConverterActivity"
+            android:label="@string/title_activity_main"
+            android:icon="@mipmap/ic_launcher_pet"
+            android:roundIcon="@mipmap/ic_launcher_pet_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Long-press the app icon for "Live camera" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
 
         <!-- Home-screen widgets -->
         <receiver

@@ -20,11 +20,11 @@ import { nativeVision, nativeIdentify, scriptForCurrencies } from './native-visi
 import { cameraSupported, startCamera, stopCamera, torchSupported, setTorch, grabFrame } from './camera.js';
 import { readPrices, identifyLanguage, readInLanguage, mergePrices } from './scan.js';
 import { textLines, labelFor } from './layout.js';
-import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
+import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, languageForCurrencies, isLatinLanguage, SCAN_LANGUAGES, TARGET_LANGUAGES } from './language.js';
 import { translateLines, translateLive, translationMethod, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v33'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v34'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -59,6 +59,7 @@ const settings = {
   font: 'hud',
   fx: { scanlines: true, grid: true, glow: true },
   cameraMode: 'prices', // the live camera shows converted "prices" or "translate"s the text
+  iconFollowsTheme: true, // Android app: the launcher icon matches the theme
   ...load('settings', {}),
 };
 if (settings.skin === 'frostmire') settings.skin = 'ironbeetle'; // renamed theme
@@ -391,6 +392,21 @@ function applyTheme() {
   $('meta[name="theme-color"]').setAttribute('content', barColor || '#040605');
   renderAppearanceControls();
   syncWidget();
+  syncAppIcon();
+}
+
+let sentIcon = null;
+
+/** Android app: the icon in the launcher matches the theme (it changes when you leave the app). */
+function syncAppIcon() {
+  if (!isNativeApp) return;
+  const theme = settings.iconFollowsTheme ? skinById(settings.skin).id : 'hud';
+  if (theme === sentIcon) return;
+  sentIcon = theme;
+  // Older app versions don't have this and just ignore it.
+  window.Capacitor.nativePromise('Widgets', 'setIcon', { theme }).catch(() => {
+    sentIcon = null;
+  });
 }
 
 function renderAppearanceControls() {
@@ -1542,6 +1558,7 @@ async function analyseLanguage(run, forcedLang = null) {
         hintCurrencies: [...scan.englishPrices.flatMap((p) => p.candidates || []), settings.source],
         engine: scan.readEngine,
         script: scan.readScript,
+        region: settings.autoSource ? settings.sourceRegion : null,
         isCancelled: () => !live(),
         onProbe: (index, total) => {
           if (!live()) return;
@@ -1936,7 +1953,7 @@ async function openCamera() {
 function liveScript() {
   const byLanguage = { ja: 'japanese', ko: 'korean', zh: 'chinese', 'zh-TW': 'chinese', hi: 'devanagari' }[live.lang];
   if (byLanguage) return byLanguage;
-  const byCurrency = scriptForCurrencies([settings.source]);
+  const byCurrency = scriptForCurrencies(liveCurrencies());
   if (live.mode !== 'translate' || live.lang) return byCurrency;
   // Text in an unknown script: every few frames look with the Japanese and Korean readers too, which find CJK text
   // the Latin reader skips.
@@ -2074,7 +2091,13 @@ function scriptLanguage(text) {
   return null;
 }
 
-/** Work out (about once a second) the language of the text in view. */
+/** The currencies of the prices in view (most likely first), then "prices in". */
+function liveCurrencies() {
+  return [...new Set([...live.items.map((item) => currencyOf(item, live.items, null)), settings.source].filter(Boolean))];
+}
+
+/** Work out (about once a second) the language of the text in view. Its currency helps: short or unclear text is
+ * taken to be in the language the currency suggests. */
 function liveLanguage(lines) {
   const now = performance.now();
   if (now - live.langCheckedAt < 1200) return;
@@ -2082,9 +2105,19 @@ function liveLanguage(lines) {
   const steady = live.lineTracks.filter((track) => track.hits >= 2).map((track) => track.text).join('\n');
   const text = steady || lines.map((line) => line.text).join('\n');
   const byScript = scriptLanguage(text);
+  const fromCurrency = languageForCurrencies(liveCurrencies(), settings.autoSource ? settings.sourceRegion : null);
+  const latinCurrency = isLatinLanguage(fromCurrency) ? fromCurrency : null;
+  const letterCount = (text.match(/\p{L}/gu) || []).length;
   if (byScript) {
     setLiveLanguage(byScript);
-  } else if ((text.match(/\p{L}/gu) || []).length >= 12) {
+  } else if (letterCount >= 30) {
+    const session = live.session;
+    nativeIdentify(text).then((lang) => {
+      if (session === live.session) setLiveLanguage(lang || detectLatinLanguage(text) || latinCurrency);
+    });
+  } else if (letterCount >= 3 && latinCurrency) {
+    setLiveLanguage(latinCurrency);
+  } else if (letterCount >= 12) {
     const session = live.session;
     nativeIdentify(text).then((lang) => {
       if (session === live.session) setLiveLanguage(lang || detectLatinLanguage(text));
@@ -2390,6 +2423,12 @@ $('#translate-to').addEventListener('click', () => {
   });
 });
 
+$('#icon-toggle').addEventListener('change', (event) => {
+  settings.iconFollowsTheme = event.target.checked;
+  saveSettings();
+  syncAppIcon();
+});
+
 $('#auto-source-toggle').addEventListener('change', (event) => {
   settings.autoSource = event.target.checked;
   saveSettings();
@@ -2501,6 +2540,7 @@ function renderAll() {
   for (const el of $$('[data-name]')) el.textContent = getCurrency(settings[el.dataset.name]).name;
   $('#welcome').hidden = settings.homeChosen;
   $('#auto-source-toggle').checked = settings.autoSource;
+  $('#icon-toggle').checked = settings.iconFollowsTheme;
   $('#source-badge').hidden = !(settings.autoSource && settings.sourceRegion);
   $('#source-hint').textContent = !settings.autoSource
     ? 'Set by you'
@@ -2647,6 +2687,7 @@ function renderAppUpdate(state) {
 }
 
 async function installAppUpdate() {
+  toast('Downloading the update…');
   try {
     const result = await window.Capacitor.nativePromise('Widgets', 'installUpdate', {});
     if (result?.needsPermission) toast('Allow Converter to install updates, then tap Install again');

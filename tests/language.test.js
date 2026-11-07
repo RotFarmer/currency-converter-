@@ -7,6 +7,9 @@ import {
   scriptCandidates,
   scriptScore,
   looksLikeOtherScript,
+  languageForCurrency,
+  languageForCurrencies,
+  isLatinLanguage,
 } from '../js/language.js';
 
 const line = (...words) => ({ words: words.map(([text, confidence]) => ({ text, confidence })) });
@@ -57,4 +60,20 @@ test('scores how well a model read its script', () => {
 test('spots text the English model could not read', () => {
   assert.equal(looksLikeOtherScript([line(['Bho', 0], ['—xv', 0]), line(['BRIE', 14], ['XY', 28]), line(['¥980', 87])]), true);
   assert.equal(looksLikeOtherScript([line(['Croissant', 96]), line(['au', 95], ['beurre', 95]), line(['oignon', 5])]), false);
+});
+
+test('works out the language from the currency', () => {
+  assert.equal(languageForCurrency('JPY'), 'ja');
+  assert.equal(languageForCurrency('THB'), 'th');
+  assert.equal(languageForCurrency('BRL'), 'pt');
+  assert.equal(languageForCurrency('MXN'), 'es');
+  // shared currencies go by the country
+  assert.equal(languageForCurrency('EUR', 'FR'), 'fr');
+  assert.equal(languageForCurrency('EUR', 'IT'), 'it');
+  assert.equal(languageForCurrency('CHF', 'CH'), 'de');
+  assert.equal(languageForCurrency('EUR'), null);
+  assert.equal(languageForCurrencies(['EUR', 'KRW'], null), 'ko');
+  assert.equal(languageForCurrencies(['EUR', 'KRW'], 'ES'), 'es');
+  assert.equal(isLatinLanguage('pt'), true);
+  assert.equal(isLatinLanguage('ja'), false);
 });

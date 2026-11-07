@@ -131,28 +131,59 @@ final class Updater {
         File dir = new File(context.getCacheDir(), "updates");
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("No room for the update");
         File apk = new File(dir, "Converter-" + release.versionCode + ".apk");
+        File partial = new File(dir, "Converter-" + release.versionCode + ".part");
         File[] old = dir.listFiles();
-        if (old != null) for (File file : old) if (!file.equals(apk)) file.delete();
+        if (old != null) for (File file : old) if (!file.equals(apk) && !file.equals(partial)) file.delete();
         if (apk.length() > 0) return apk;
-        File partial = new File(dir, "download.part");
-        HttpURLConnection connection = (HttpURLConnection) new URL(release.apkUrl).openConnection();
-        connection.setConnectTimeout(15000);
-        connection.setReadTimeout(30000);
-        try (InputStream in = connection.getInputStream(); OutputStream out = new FileOutputStream(partial)) {
-            byte[] buffer = new byte[64 * 1024];
-            int n;
-            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
-        } finally {
-            connection.disconnect();
+        // Mobile connections drop out: each try carries on from where the last one stopped.
+        IOException last = null;
+        for (int attempt = 0; attempt < 6; attempt++) {
+            try {
+                if (downloadPart(release.apkUrl, partial)) break;
+            } catch (IOException e) {
+                last = e;
+                try {
+                    Thread.sleep(1500L * (attempt + 1));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
         }
         if (partial.length() < 100_000 || !partial.renameTo(apk)) {
-            partial.delete();
-            throw new IOException("The download didn't finish");
+            throw last != null ? last : new IOException("The download didn't finish");
         }
         return apk;
     }
 
-    /** Hands the APK to Android's package installer. user: you tapped Install (so a confirmation may be shown). */
+    /** Downloads the rest of the file into `partial`; true once it's complete. */
+    private static boolean downloadPart(String address, File partial) throws IOException {
+        long have = partial.length();
+        HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
+        connection.setConnectTimeout(20000);
+        connection.setReadTimeout(60000);
+        if (have > 0) connection.setRequestProperty("Range", "bytes=" + have + "-");
+        try {
+            int code = connection.getResponseCode();
+            if (code == 416) return true; // nothing left to fetch
+            if (code != 200 && code != 206) throw new IOException("The server answered " + code);
+            boolean append = code == 206; // 200: the server sent the whole file again
+            long expected = connection.getContentLengthLong();
+            long written = 0;
+            try (InputStream in = connection.getInputStream(); OutputStream out = new FileOutputStream(partial, append)) {
+                byte[] buffer = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, n);
+                    written += n;
+                }
+            }
+            return expected < 0 || written >= expected;
+        } finally {
+            connection.disconnect();
+        }
+    }
+
     static void install(Context context, File apk, boolean user) throws IOException {
         PackageInstaller installer = context.getPackageManager().getPackageInstaller();
         PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
@@ -180,11 +211,11 @@ final class Updater {
      */
     static void updateQuietly(Context context) {
         try {
-            if (!canUpdateQuietly(context) || MainActivity.isVisible()) return;
+            if (!canUpdateQuietly(context) || ConverterActivity.isVisible()) return;
             Release release = latest(context);
             if (release.versionCode <= installedVersion(context) || !release.sameKey) return;
             File apk = download(context, release);
-            if (MainActivity.isVisible()) return;
+            if (ConverterActivity.isVisible()) return;
             install(context, apk, false);
         } catch (Exception e) {
             lastStatus = "failed: " + e.getMessage();

@@ -2582,6 +2582,18 @@
   from { opacity: 0; transform: translate3d(0, 22px, 0); }
 }
 
+/* While a sheet or the camera is open, the theme's art behind it stands still: it can't be seen, and the phone's
+   graphics are free for the sheet sliding up (and the camera uses less battery). */
+:root:has(.sheet-backdrop:not([hidden]), .camera:not([hidden]))::before,
+:root:has(.sheet-backdrop:not([hidden]), .camera:not([hidden]))::after,
+:root:has(.sheet-backdrop:not([hidden]), .camera:not([hidden])) :is(body, .app, main)::before,
+:root:has(.sheet-backdrop:not([hidden]), .camera:not([hidden])) :is(body, .app, main)::after,
+:root:has(.sheet-backdrop:not([hidden]), .camera:not([hidden])) .app *,
+:root:has(.sheet-backdrop:not([hidden]), .camera:not([hidden])) .app *::before,
+:root:has(.sheet-backdrop:not([hidden]), .camera:not([hidden])) .app *::after {
+  animation-play-state: paused !important;
+}
+
 /* ===== lv_aero.css ===== */
 /* ---------- Frutiger Aero: the future, as it looked in 2007 ----------
    A glossy globe turning in the sky with a moon on a tilted orbit, ribbons of green and blue light swaying, glossy
@@ -3070,6 +3082,19 @@
     animation: none !important;
   }
   :root[data-skin="aurora"] .tabbar::after { display: none; }
+}
+
+/* ---------- Smooth on every phone ----------
+   Nothing in Aurora repaints on every frame any more: the gradients on the titles, buttons, switches and badge stand
+   still (the shine still sweeps across buttons, by moving rather than repainting), and the panels' rainbow edges
+   glow instead of turning. Repainting all of that each frame kept some phones' graphics so busy that a sheet sliding
+   up didn't finish drawing, and parts of it flashed (seen on a Samsung S23 Ultra). */
+:root[data-skin="aurora"] :is(.topbar h1, .sheet-header h2, .sys-code, .btn-primary, .install-top, .segmented button[aria-pressed="true"], .switch:checked) { animation: none; }
+:root[data-skin="aurora"] .tabbar button[aria-current="page"]::before { animation: aurora-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+:root[data-skin="aurora"] .panel::before { animation: au-edge 4.5s ease-in-out infinite alternate; }
+@keyframes au-edge {
+  from { opacity: 0.45; }
+  to { opacity: 0.9; }
 }
 
 /* ===== lv_camera.css ===== */
