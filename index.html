@@ -138,7 +138,7 @@
           </div>
 
           <div class="extra" id="extra" hidden>
-            <div class="extra-head"><span>Tap any amount to type in it</span><span id="extra-limit">0/10</span></div>
+            <div class="extra-head"><span>Hold a currency to move or remove it</span><span id="extra-limit">0/10</span></div>
             <div id="extra-list"></div>
             <button type="button" class="add-btn" id="extra-add">
               <svg aria-hidden="true"><use href="#i-plus"/></svg> Add currency
@@ -491,6 +491,21 @@
       <div class="sheet-actions">
         <button type="button" class="btn btn-ghost danger" id="price-remove">Remove</button>
         <button type="button" class="btn btn-secondary" id="price-open">Open in converter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remove a ☰ currency (hold its row) -->
+  <div class="sheet-backdrop" id="extra-sheet" hidden>
+    <div class="sheet sheet-bottom" role="dialog" aria-modal="true" aria-labelledby="extra-sheet-title">
+      <div class="sheet-header">
+        <h2 id="extra-sheet-title">Remove?</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <p class="sheet-note" id="extra-sheet-note"></p>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-secondary" data-close>Keep</button>
+        <button type="button" class="btn btn-ghost danger" id="extra-sheet-remove">Remove</button>
       </div>
     </div>
   </div>

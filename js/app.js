@@ -24,7 +24,7 @@ import { currencyForLanguage, languageName, isRtl, detectLatinLanguage, language
 import { translateLines, translateLive, translationMethod, googleTranslateUrl } from './translate.js';
 import { load, save } from './storage.js';
 
-const APP_VERSION = 'v40'; // keep in step with VERSION in sw.js
+const APP_VERSION = 'v41'; // keep in step with VERSION in sw.js
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -894,7 +894,7 @@ function renderExtraCurrencies() {
               <span class="name">${escapeHtml(currency.name)}</span>
               <input class="extra-input" data-extra="${code}" inputmode="decimal" autocomplete="off" enterkeyhint="done"
                      placeholder="0" aria-label="Amount in ${code}">
-              <button type="button" class="row-remove" data-remove="${code}" aria-label="Remove ${code}"><svg><use href="#i-close"/></svg></button>
+              <button type="button" class="row-remove" data-row-clear="${code}" aria-label="Clear the amount"><svg><use href="#i-close"/></svg></button>
             </div>`;
           })
           .join('')
@@ -906,8 +906,10 @@ function renderExtraCurrencies() {
 function updateExtraValues() {
   for (const input of $$('.extra-input')) {
     const code = input.dataset.extra;
-    if (converter.field === `extra:${code}` && document.activeElement === input) continue;
-    input.value = formatInputNumber(amountIn(code), code);
+    const typing = converter.field === `extra:${code}` && document.activeElement === input;
+    if (!typing) input.value = formatInputNumber(amountIn(code), code);
+    // × shows only when there's an amount to clear
+    input.nextElementSibling?.toggleAttribute('data-empty', input.value === '');
   }
 }
 
@@ -925,9 +927,23 @@ function saveExtra() {
   renderReference();
 }
 
-// Putting the ☰ currencies in your own order: drag a row by its handle (⋮⋮), or focus the handle and use
-// the arrow keys. The order is also the order of the quick reference tabs and of the widgets.
+// Putting the ☰ currencies in your own order: hold a row and move it (or drag it straight away by its handle ⋮⋮, or
+// focus the handle and use the arrow keys). Holding a row without moving it offers to remove it. The order is also
+// the order of the quick reference tabs and of the widgets.
 let drag = null;
+const HOLD_MS = 450;
+let hold = null; // a press on a row, waiting to see if it's held
+let heldEndedAt = -Infinity;
+
+// Letting go of a held row isn't also a tap: on whatever's under the finger then (the popup that just opened, maybe
+// its Remove button), or on the row.
+document.addEventListener('click', (event) => {
+  if (performance.now() - heldEndedAt < 350) {
+    heldEndedAt = -Infinity; // just that one
+    event.stopPropagation();
+    event.preventDefault();
+  }
+}, true);
 
 function moveExtra(from, to) {
   if (to < 0 || to >= settings.extra.length || to === from) return;
@@ -961,20 +977,64 @@ function previewTabs(from, to) {
   }
 }
 
-$('#extra-list').addEventListener('pointerdown', (event) => {
-  const handle = event.target.closest('.row-handle');
-  if (!handle || drag || settings.extra.length < 2) return;
-  event.preventDefault();
+/** Pick a row up. held: it was picked up by holding it (it only moves once the finger does). */
+function startDrag(pointerId, row, clientY, held) {
   const rows = $$('#extra-list .extra-row');
-  const row = handle.closest('.extra-row');
   const from = rows.indexOf(row);
   // Row positions on the page (not the screen), so scrolling while dragging is fine.
   const tops = rows.map((r) => r.getBoundingClientRect().top + scrollY);
   const step = rows.length > 1 ? tops[1] - tops[0] : row.offsetHeight;
-  drag = { pointerId: event.pointerId, rows, row, tops, step, from, to: from, startY: event.clientY + scrollY, lastY: event.clientY, scrollTimer: 0 };
-  handle.setPointerCapture(event.pointerId);
+  drag = { pointerId, rows, row, tops, step, from, to: from, startY: clientY + scrollY, lastY: clientY, scrollTimer: 0, held, moved: !held };
   row.classList.add('dragging');
   $('#extra-list').classList.add('sorting');
+}
+
+$('#extra-list').addEventListener('pointerdown', (event) => {
+  const handle = event.target.closest('.row-handle');
+  if (handle) {
+    if (drag || settings.extra.length < 2) return;
+    event.preventDefault();
+    startDrag(event.pointerId, handle.closest('.extra-row'), event.clientY, false);
+    handle.setPointerCapture(event.pointerId);
+    return;
+  }
+  // Anywhere else on a row but its amount and ×: hold it.
+  const row = event.target.closest('.extra-row');
+  if (!row || drag || hold || event.target.closest('.extra-input, .row-remove') || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  row.classList.add('pressing');
+  hold = { pointerId: event.pointerId, row, x: event.clientX, y: event.clientY, lastY: event.clientY, timer: setTimeout(liftRow, HOLD_MS) };
+});
+
+function cancelHold() {
+  if (!hold) return;
+  clearTimeout(hold.timer);
+  hold.row.classList.remove('pressing');
+  hold = null;
+}
+
+/** Held long enough: the row lifts. Moving now rearranges; letting go without moving offers to remove it. */
+function liftRow() {
+  const { pointerId, row, lastY } = hold;
+  cancelHold();
+  if (!row.isConnected) return;
+  swipe = null; // not a swipe to the next page any more
+  startDrag(pointerId, row, lastY, true);
+  try {
+    row.setPointerCapture(pointerId);
+  } catch {
+    // the finger already lifted
+  }
+  navigator.vibrate?.(12);
+}
+
+// Once a row is lifted, the finger moves it rather than scrolling the page.
+document.addEventListener('touchmove', (event) => {
+  if (drag?.held) event.preventDefault();
+}, { passive: false });
+
+// Holding a row's name shouldn't select it or open the phone's text menu.
+$('#extra-list').addEventListener('contextmenu', (event) => {
+  if (!event.target.closest('.extra-input')) event.preventDefault();
 });
 
 function dragTo(clientY) {
@@ -1012,27 +1072,49 @@ function dragAutoScroll() {
 }
 
 $('#extra-list').addEventListener('pointermove', (event) => {
+  if (hold && event.pointerId === hold.pointerId) {
+    hold.lastY = event.clientY;
+    // Moved before it was held: scrolling or swiping, not holding.
+    if (Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > 10) cancelHold();
+    return;
+  }
   if (!drag || event.pointerId !== drag.pointerId) return;
+  if (!drag.moved) {
+    if (Math.abs(event.clientY + scrollY - drag.startY) < 8) return;
+    drag.moved = true;
+  }
   dragTo(event.clientY);
   if (!drag.scrollTimer) drag.scrollTimer = requestAnimationFrame(dragAutoScroll);
 });
 
 function endDrag(event) {
+  if (hold && event.pointerId === hold.pointerId) {
+    cancelHold(); // let go before it was held: a tap
+    return;
+  }
   if (!drag || event.pointerId !== drag.pointerId) return;
-  const { from, to, rows, row, scrollTimer } = drag;
+  const { from, to, rows, row, scrollTimer, held, moved } = drag;
   cancelAnimationFrame(scrollTimer);
   drag = null;
+  if (held) heldEndedAt = performance.now();
   $('#extra-list').classList.remove('sorting');
   row.classList.remove('dragging');
   for (const r of rows) r.style.transform = '';
-  if (event.type === 'pointerup' && to !== from) moveExtra(from, to);
+  if (event.type === 'pointerup' && held && !moved) openExtraSheet(row.dataset.code);
+  else if (event.type === 'pointerup' && to !== from) moveExtra(from, to);
   else renderReference();
 }
-$('#extra-list').addEventListener('pointerup', endDrag);
-$('#extra-list').addEventListener('pointercancel', endDrag);
+// On the window: the finger may lift outside the list before the row was picked up.
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
 
 $('#extra-list').addEventListener('keydown', (event) => {
   const handle = event.target.closest('.row-handle');
+  if (handle && (event.key === 'Delete' || event.key === 'Backspace')) {
+    event.preventDefault();
+    openExtraSheet(handle.dataset.handle);
+    return;
+  }
   if (!handle || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
   event.preventDefault();
   const code = handle.dataset.handle;
@@ -1075,10 +1157,19 @@ $('#extra-add').addEventListener('click', () => {
   });
 });
 
+// × clears the amount, like the × on the main fields (all the amounts go with it, as they're the same money).
 $('#extra-list').addEventListener('click', (event) => {
-  const button = event.target.closest('[data-remove]');
+  const button = event.target.closest('[data-row-clear]');
   if (!button) return;
-  const code = button.dataset.remove;
+  const input = $(`.extra-input[data-extra="${button.dataset.rowClear}"]`);
+  if (!input) return;
+  input.value = '';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.focus();
+});
+
+function removeExtra(code) {
+  if (!settings.extra.includes(code)) return;
   if (converter.field === `extra:${code}`) {
     // The amount was typed in this row: keep it, now held in the "price in" field.
     converter.value = amountIn(settings.source);
@@ -1087,6 +1178,22 @@ $('#extra-list').addEventListener('click', (event) => {
   settings.extra = settings.extra.filter((c) => c !== code);
   saveExtra();
   renderConverterValues();
+}
+
+// The popup for removing a ☰ currency (hold its row).
+let sheetExtra = null;
+
+function openExtraSheet(code) {
+  sheetExtra = code;
+  $('#extra-sheet-title').textContent = `Remove ${code}?`;
+  $('#extra-sheet-note').textContent = `${getCurrency(code).name} comes off your list, Quick reference and the widgets. You can add it back with +.`;
+  openSheet($('#extra-sheet'));
+}
+
+$('#extra-sheet-remove').addEventListener('click', () => {
+  const code = sheetExtra;
+  closeSheet($('#extra-sheet'));
+  if (code) removeExtra(code);
 });
 
 function renderRateLine() {

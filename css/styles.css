@@ -531,7 +531,21 @@ main { padding: 16px 16px 0; overflow-x: clip; touch-action: pan-y pinch-zoom; }
   animation: drop 0.15s ease;
 }
 .extra-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 2px; font-size: 12px; color: var(--text-faint); }
-.extra-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.extra-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  /* hold a row to move or remove it: holding its name mustn't select text or open the phone's text menu */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: background-color 0.35s ease;
+}
+.extra-row .extra-input { -webkit-user-select: text; user-select: text; }
+.extra-row.pressing { background-color: var(--panel-2); }
+.row-remove[data-empty] { visibility: hidden; }
 .row-remove {
   display: grid;
   place-items: center;
